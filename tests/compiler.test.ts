@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { compilePrompt, detectScript, orderAssets, toRules, type CompileInput } from "@/lib/prompt/compiler";
 import { emptyDna, parseDna } from "@/lib/style-dna";
+import { detectEmotion, detectScenes } from "@/lib/prompt/scenes";
 import { BUILT_IN_PRESETS } from "@/lib/presets";
 
 function base(over: Partial<CompileInput["options"]> = {}): CompileInput {
@@ -36,6 +37,7 @@ function base(over: Partial<CompileInput["options"]> = {}): CompileInput {
       colorMood: "creator",
       referencePriority: "balanced",
       variation: "safe",
+      promptStyle: "detailed",
       ...over,
     },
   };
@@ -130,5 +132,69 @@ describe("helpers", () => {
   it("parseDna tolerates garbage", () => {
     expect(parseDna("not json").colorGrading.rules).toBe("");
     expect(parseDna('{"lighting":{"rules":"x","locked":true}}').lighting).toEqual({ rules: "x", locked: true });
+  });
+});
+
+describe("concise brief (default)", () => {
+  const concise = (over: Partial<CompileInput["options"]> = {}, assets?: CompileInput["assets"]) => {
+    const input = base({ promptStyle: "concise", gameName: "EA FC 27", ...over });
+    input.preset = null;
+    if (assets) input.assets = assets;
+    return compilePrompt(input);
+  };
+
+  it("is short, concept-first and deterministic", () => {
+    const a = concise({ concept: "I opened 50 packs" });
+    expect(a.prompt).toBe(concise({ concept: "I opened 50 packs" }).prompt);
+    expect(a.stats.words).toBeLessThan(400);
+    expect(a.prompt.indexOf("Video idea")).toBeLessThan(a.prompt.indexOf("Composition"));
+    expect(a.prompt).toContain("an EA FC 27 video");
+  });
+
+  it("picks an on-topic EA FC scene from the concept (Arabic and English)", () => {
+    expect(concise({ concept: "فتحت ٥٠ بكج أيقونة" }).prompt).toContain("pack-opening tunnel");
+    expect(concise({ concept: "Best custom tactics for EA FC 27" }).prompt).toContain("tactics board");
+    expect(concise({ concept: "طورت الكرت ده" }).prompt).toContain("before and after");
+  });
+
+  it("explicit video type wins over detection", () => {
+    expect(concise({ concept: "فتحت بكجات", sceneId: "coins" }).prompt).toContain("FUT coins");
+  });
+
+  it("describes a card attached as 'Other asset' as the hero item, not as the face", () => {
+    const out = concise({ concept: "How have I not played with this card?" }, [
+      { id: "f", kind: "face", label: "me", priority: 1 },
+      { id: "c", kind: "asset", label: "card", priority: 3 },
+    ]);
+    expect(out.prompt).toContain("1. photo of Test Creator");
+    expect(out.prompt).toContain("2. the card / item for this video");
+    expect(out.warnings.some((w) => w.includes("Face/Expression"))).toBe(false);
+  });
+
+  it("warns when several images are marked as the face", () => {
+    const out = concise({}, [
+      { id: "f", kind: "face", label: "me", priority: 1 },
+      { id: "c", kind: "face", label: "card", priority: 2 },
+    ]);
+    expect(out.warnings.some((w) => w.includes("Face/Expression"))).toBe(true);
+  });
+
+  it("keeps identity and text rules", () => {
+    const p = concise({ textMode: "render", headline: "أقوى بكج" }).prompt;
+    expect(p).toContain("keep this exact face");
+    expect(p).toContain("right-to-left");
+    expect(concise({ textMode: "none" }).prompt).toContain("no additional text");
+  });
+});
+
+describe("scene + emotion detection", () => {
+  it("detects topics", () => {
+    expect(detectScenes("FUT Champions rewards")[0].id).toBe("champions");
+    expect(detectScenes("تشكيلة بميزانية ١٠٠ الف")[0].id).toBe("squad");
+    expect(detectScenes("random words")).toHaveLength(0);
+  });
+  it("detects emotion", () => {
+    expect(detectEmotion("مش مصدق اللي حصل")).toContain("shocked");
+    expect(detectEmotion("خسرت كل الكوينز")).toContain("frustrated");
   });
 });

@@ -80,6 +80,7 @@ export interface ProjectRecord {
   referencePriority: string;
   customInstructions: string;
   variation: string;
+  promptStyle?: string;
   selectedAssetIds: string[];
   compiledPrompt: string;
   createdAt: string;
@@ -137,6 +138,7 @@ export interface AppSettings {
   defaultReferencePriority: string;
   exportFormat: string;
   exportFit: string;
+  promptStyle: string;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -145,4 +147,5 @@ export const DEFAULT_SETTINGS: AppSettings = {
   defaultReferencePriority: "balanced",
   exportFormat: "jpg",
   exportFit: "cover",
+  promptStyle: "concise",
 };

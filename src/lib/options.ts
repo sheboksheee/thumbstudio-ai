@@ -39,6 +39,11 @@ export const VARIATIONS = [
   { value: "experimental", label: "Experimental", desc: "Push the visual idea; only locked DNA is fixed." },
 ] as const;
 
+export const PROMPT_STYLES = [
+  { value: "concise", label: "Short", desc: "Short, natural brief — usually gives ChatGPT the best results." },
+  { value: "detailed", label: "Detailed", desc: "Full structured spec with every rule spelled out." },
+] as const;
+
 export const ASSET_KINDS = [
   { value: "face", label: "Face", desc: "Identity photos of the creator" },
   { value: "expression", label: "Expression", desc: "Emotion / expression photography" },

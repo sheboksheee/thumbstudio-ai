@@ -147,6 +147,9 @@ function AssetCard({ asset, creator, onPreview, wide }: { asset: AssetDTO; creat
             {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{PRIORITY_LABELS[n]}</option>)}
           </NativeSelect>
         </div>
+        <NativeSelect className="h-7 pl-2 pr-6 text-[11px]" value={a.kind} onChange={(e) => patch({ kind: e.target.value })} title="Image type — tells the prompt what this image is">
+          {ASSET_KINDS.map((k) => <option key={k.value} value={k.value}>Type: {k.label}</option>)}
+        </NativeSelect>
         {a.kind === "logo" && !isLogo && (
           <button className="text-[11px] text-primary hover:underline" onClick={() => setAs("logoAssetId")}>Set as main logo</button>
         )}

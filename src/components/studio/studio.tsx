@@ -14,7 +14,8 @@ import { CreatorAvatar } from "@/components/creator-avatar";
 import { AssetPicker, autoSelect } from "./asset-picker";
 import { ChatGPTDialog } from "./chatgpt-dialog";
 import { compilePrompt, detectScript, type CompilerOptions } from "@/lib/prompt/compiler";
-import { COLOR_MOODS, REFERENCE_PRIORITIES, SUBJECT_SCALES, VARIATIONS, type Variation } from "@/lib/options";
+import { COLOR_MOODS, PROMPT_STYLES, REFERENCE_PRIORITIES, SUBJECT_SCALES, VARIATIONS, type Variation } from "@/lib/options";
+import type { PromptStyle } from "@/lib/prompt/compiler";
 import type { AppSettings, AssetDTO, CreatorWithCounts, PresetDTO, ProjectWithCount } from "@/lib/types";
 import { saveProject as storeSaveProject } from "@/lib/store";
 import { BASE_PATH } from "@/lib/hooks";
@@ -43,6 +44,7 @@ const DEFAULT_OPTIONS = (s: AppSettings): CompilerOptions => ({
   referencePriority: (s.defaultReferencePriority as CompilerOptions["referencePriority"]) || "balanced",
   customInstructions: "",
   variation: (s.defaultVariation as Variation) || "safe",
+  promptStyle: (s.promptStyle as PromptStyle) || "concise",
 });
 
 export function Studio({
@@ -79,6 +81,7 @@ export function Studio({
             referencePriority: p.referencePriority as CompilerOptions["referencePriority"],
             customInstructions: p.customInstructions,
             variation: p.variation as Variation,
+            promptStyle: ((p.promptStyle as PromptStyle) || "concise"),
           },
         };
       }
@@ -175,7 +178,7 @@ export function Studio({
       const p = await storeSaveProject(projectId, {
         creatorId, presetId, ...opts, headline: opts.headline ?? "", colorMoodCustom: opts.colorMoodCustom ?? "",
         backgroundDirection: opts.backgroundDirection ?? "", customInstructions: opts.customInstructions ?? "",
-        selectedAssetIds: selected, compiledPrompt: finalPrompt, title: opts.concept.slice(0, 90),
+        selectedAssetIds: selected, compiledPrompt: finalPrompt, title: opts.concept.slice(0, 90), promptStyle: opts.promptStyle ?? "concise",
       });
       setProjectId(p.id);
       setSavedSnapshot(snapshot);
@@ -383,12 +386,21 @@ export function Studio({
               <div className="flex items-center gap-2 text-sm font-semibold"><FileText className="h-4 w-4 text-primary" /> Compiled prompt</div>
               {compiled && <span className="font-mono text-[11px] text-muted-foreground">{finalPrompt.split(/\s+/).filter(Boolean).length} words · {finalPrompt.length} chars</span>}
             </div>
+            <div className="mb-2 flex items-center gap-2">
+              <span className="text-[11px] text-muted-foreground">Prompt</span>
+              <Segmented
+                size="sm"
+                value={(opts.promptStyle ?? "concise") as PromptStyle}
+                onChange={(v) => { set("promptStyle", v); setManualPrompt(null); }}
+                options={PROMPT_STYLES.map((p) => ({ value: p.value, label: p.label }))}
+              />
+            </div>
             <Segmented
               value={opts.variation}
               onChange={(v) => set("variation", v)}
               options={VARIATIONS.map((v) => ({ value: v.value, label: v.label, icon: v.value === "safe" ? <Check /> : v.value === "creative" ? <Sparkles /> : <Zap /> }))}
             />
-            <div className="mt-1.5 text-[11px] text-muted-foreground">{VARIATIONS.find((v) => v.value === opts.variation)?.desc} Identity &amp; locked DNA are preserved in all variations.</div>
+            <div className="mt-1.5 text-[11px] text-muted-foreground">{PROMPT_STYLES.find((p) => p.value === (opts.promptStyle ?? "concise"))?.desc} {VARIATIONS.find((v) => v.value === opts.variation)?.desc}</div>
 
             {compiled && compiled.warnings.length > 0 && (
               <div className="mt-3 space-y-1 rounded-lg border border-warning/30 bg-warning/[0.06] p-2.5">

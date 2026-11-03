@@ -8,7 +8,7 @@ import { Card } from "@/components/ui/misc";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PresetList } from "@/components/presets/preset-list";
 import { DemoButton } from "@/components/demo-button";
-import { REFERENCE_PRIORITIES, VARIATIONS } from "@/lib/options";
+import { PROMPT_STYLES, REFERENCE_PRIORITIES, VARIATIONS } from "@/lib/options";
 import type { AppSettings, PresetDTO } from "@/lib/types";
 import { ensureBuiltInPresets, exportBackup, importBackup, saveSettings } from "@/lib/store";
 import { downloadBlob } from "@/lib/image-export";
@@ -97,6 +97,12 @@ export function SettingsView({ settings, presets, creators }: { settings: AppSet
               <p className="mt-1 text-[11px] text-muted-foreground">Opened in a new tab by “Copy Prompt &amp; Open ChatGPT”. You can point it at a specific project or custom GPT URL.</p>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <Label>Default prompt length</Label>
+                <NativeSelect value={s.promptStyle} onChange={(e) => setS({ ...s, promptStyle: e.target.value })}>
+                  {PROMPT_STYLES.map((v) => <option key={v.value} value={v.value}>{v.label}</option>)}
+                </NativeSelect>
+              </div>
               <div>
                 <Label>Default variation</Label>
                 <NativeSelect value={s.defaultVariation} onChange={(e) => setS({ ...s, defaultVariation: e.target.value })}>

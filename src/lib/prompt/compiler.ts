@@ -16,6 +16,7 @@
  *   7. Negative constraints
  */
 import { DNA_CATEGORIES, type StyleDna } from "../style-dna";
+import { GENERIC_SCENE, detectEmotion, detectScenes, sceneById } from "./scenes";
 import type {
   AssetKind,
   ColorMood,
@@ -45,6 +46,8 @@ export interface CompilerCreator {
 
 export interface CompilerPreset {
   name: string;
+  /** Set for custom presets (owned by a creator). */
+  creatorId?: string | null;
   niche?: string;
   objective?: string;
   composition?: string;
@@ -76,7 +79,15 @@ export interface CompilerOptions {
   referencePriority: ReferencePriority;
   customInstructions?: string;
   variation: Variation;
+  /** "concise" (default): short natural-language brief. "detailed": full structured spec. */
+  promptStyle?: PromptStyle;
+  /** Topic scene id from scenes.ts ("auto"/undefined = detect from concept). */
+  sceneId?: string;
+  /** Game name used in the prompt, e.g. "EA FC 27". */
+  gameName?: string;
 }
+
+export type PromptStyle = "concise" | "detailed";
 
 export interface CompileInput {
   creator: CompilerCreator;
@@ -236,6 +247,182 @@ const VARIATION_TEXT: Record<Variation, { label: string; direction: string[] }> 
 // Compiler
 
 export function compilePrompt(input: CompileInput): CompileOutput {
+  return input.options.promptStyle === "detailed" ? compileDetailed(input) : compileConcise(input);
+}
+
+// ---------------------------------------------------------------------------
+// Concise brief (default)
+//
+// Image models respond best to a short, vivid, natural-language brief where the
+// video idea comes first. Only rules the art director actually filled in are
+// included — no generic boilerplate, no long negative lists.
+
+const POSITION_SHORT: Record<SubjectPosition, string> = { left: "on the left side", center: "in the center", right: "on the right side" };
+const SCALE_SHORT: Record<SubjectScale, string> = {
+  medium: "waist-up",
+  large: "large, chest-up",
+  xl: "very large, head and shoulders",
+  closeup: "close-up, face filling that side of the frame",
+};
+const MOOD_SHORT: Record<Exclude<ColorMood, "creator" | "custom">, string> = {
+  warm: "warm golden tones",
+  cold: "cold icy blue tones",
+  neon: "electric neon accents on a dark base",
+  dark: "dark, dramatic low-key lighting",
+  highkey: "bright, clean high-key look",
+};
+
+function conciseRole(a: CompilerAsset, who: string, refPriority: ReferencePriority): string {
+  const primary = (a.priority ?? 3) <= 1;
+  switch (a.kind) {
+    case "face":
+      return primary
+        ? `photo of ${who} (the creator) — keep this exact face: same features, skin tone, hair, beard, glasses and accessories`
+        : `another photo of ${who} — same person, use it for likeness`;
+    case "expression":
+      return `${who}'s expression — use this emotion and pose, same face`;
+    case "logo":
+      return "the channel logo — reproduce it exactly if used";
+    case "avatar":
+      return "the channel avatar — brand cue";
+    case "asset":
+      return "the card / item for this video — include it exactly as it is (same design, rating and colors)";
+    case "reference":
+      if (refPriority === "style") return "style reference — closely match its grading, layout and polish (not its people or text)";
+      if (refPriority === "identity") return "loose style inspiration only";
+      return "style reference — match its look and polish, not its content";
+    default:
+      return "supporting image";
+  }
+}
+
+const shortLine = (t: string | undefined) => toRules(t).join("; ");
+const SIDE_OPPOSITE: Record<SubjectPosition, string> = { left: "right side", center: "sides", right: "left side" };
+
+function isFootballNiche(...parts: (string | undefined)[]) {
+  const t = parts.filter(Boolean).join(" ").toLowerCase();
+  return /fc|fifa|فيفا|ultimate team|fut|كورة|كرة|football|soccer/.test(t);
+}
+
+function compileConcise(input: CompileInput): CompileOutput {
+  const { creator, preset, options } = input;
+  const v = options.variation;
+  const who = creator.name;
+  const ordered = orderAssets(input.assets);
+  const attachments: AttachmentItem[] = ordered.map((a, i) => ({
+    index: i + 1,
+    assetId: a.id,
+    kind: a.kind,
+    label: a.label?.trim() || `${a.kind} image`,
+    role: a.purpose?.trim() || conciseRole(a, who, options.referencePriority),
+    purpose: a.purpose?.trim() || "",
+  }));
+  const hasIdentity = attachments.some((a) => a.kind === "face" || a.kind === "expression");
+  const hasItem = attachments.some((a) => a.kind === "asset");
+  const warnings = baseWarnings(options, attachments, hasIdentity);
+  const headline = (options.headline ?? "").trim();
+  const concept = options.concept.trim();
+  const vars: Record<string, string> = { concept, headline, creator: who, channel: creator.channelName, position: options.subjectPosition, scale: options.subjectScale };
+
+  const football = isFootballNiche(creator.niche, preset?.niche, options.gameName) || !creator.niche?.trim();
+  const game = options.gameName?.trim() || (football ? "EA FC" : "");
+  // Scene: explicit choice > detected from concept > generic
+  const detected = detectScenes(concept);
+  const scene = football ? (sceneById(options.sceneId) ?? detected[0] ?? GENERIC_SCENE) : null;
+  const secondary = football && !options.sceneId ? detected.find((sc) => sc.id !== scene?.id) : undefined;
+  const emotion = detectEmotion(concept) ?? scene?.emotion ?? "a strong, believable reaction that fits the video";
+
+  const out: string[] = [];
+  out.push(
+    `Create a high-end YouTube thumbnail (16:9 landscape) for ${game ? `${/^[aeiouAEIOU]/.test(game) ? "an" : "a"} ${game} ` : "a "}video by ${who}${creator.channelName && creator.channelName !== who ? ` (channel "${creator.channelName}")` : ""} — the kind top ${football ? "EA FC" : creator.niche?.trim() || "YouTube"} creators post: bold, clean, high-contrast, trendy and instantly readable on a phone. Advanced, professional design level.`,
+  );
+
+  if (concept) {
+    const ar = detectScript(concept) === "arabic" || detectScript(concept) === "mixed";
+    out.push(`Video idea: "${concept}"${ar ? " (Arabic — understand the meaning, don't write it on the image)" : ""}`);
+  }
+
+  if (attachments.length) out.push(["Attached images:", ...attachments.map((a) => `${a.index}. ${a.role}`)].join("\n"));
+
+  // Composition
+  const heroText = hasItem ? "the attached card/item" : scene ? scene.hero : "the main story element";
+  const comp = [`${who} on the ${options.subjectPosition === "center" ? "center" : `${options.subjectPosition} side`}, ${SCALE_SHORT[options.subjectScale]}, ${emotion}.`];
+  if (options.subjectPosition !== "center") comp.push(`${heroText[0].toUpperCase()}${heroText.slice(1)} on the ${SIDE_OPPOSITE[options.subjectPosition]} as the second focal point${hasItem && scene ? ` — ${scene.hero.replace(/^the player card, /, "")}` : ""}.`);
+  else comp.push(`${heroText[0].toUpperCase()}${heroText.slice(1)} framing the creator without covering the face.`);
+  comp.push("Only 2–3 elements, clear separation between them.");
+  if (preset && !preset.creatorId && preset.composition?.trim() && v === "safe" && !scene) comp.push(preset.composition.trim());
+  out.push(`Composition: ${comp.join(" ")}`);
+
+  // Scene (topic-aware)
+  if (scene) {
+    const bg = options.backgroundDirection?.trim() || scene.background;
+    const extra = secondary ? ` Also hint at: ${secondary.hero}.` : "";
+    out.push(`Scene: ${bg}; ${scene.details}. Use real ${game} Ultimate Team visual language (FUT card design, stadium, pack lights) that matches the topic — no random abstract shapes or unrelated objects.${extra}`);
+  } else {
+    const bg = options.backgroundDirection?.trim() || shortLine(creator.background) || "a background that is clearly related to the video topic";
+    out.push(`Scene: ${bg}. Everything in the background must relate to the video — no random abstract shapes.`);
+  }
+  if (preset?.objective?.trim() && preset.creatorId) out.push(preset.objective.trim());
+  if (preset?.template?.trim() && preset.creatorId && !/\{\{\s*concept\s*\}\}/.test(preset.template)) out.push(fillTemplate(preset.template.trim(), vars));
+
+  // Look
+  const look: string[] = [`cinematic lighting with a strong rim light on ${who}`, "rich contrast", "subtle depth of field", "polished retouch with natural skin texture"];
+  if (options.colorMood === "creator") look.push(`brand colors ${[creator.primaryColor, creator.accentColor].filter(Boolean).join(" and ")}`);
+  else if (options.colorMood === "custom" && options.colorMoodCustom?.trim()) look.push(options.colorMoodCustom.trim());
+  else if (options.colorMood !== "custom") look.push(MOOD_SHORT[options.colorMood]);
+  for (const cat of DNA_CATEGORIES) {
+    const e = creator.styleDna[cat.key];
+    if (!e.rules.trim() || cat.key === "constraints") continue;
+    if (v === "experimental" && !e.locked) continue;
+    look.push(shortLine(e.rules));
+  }
+  for (const t of [creator.lighting, creator.retouching]) if (t?.trim()) look.push(shortLine(t));
+  out.push(`Look: ${look.join(", ")}.`);
+  if (v === "creative") out.push("Make it bolder and more original than a typical thumbnail, while keeping the creator's look.");
+  if (v === "experimental") out.push("Try an unexpected, scroll-stopping idea — unusual angle or scale — with one clear focal point.");
+
+  const master = creator.masterPrompt?.trim();
+  if (master) out.push(fillTemplate(master, vars).replace(/\s*\n\s*/g, " "));
+
+  // Text
+  if (options.textMode === "render" && headline) {
+    const ar = detectScript(headline) === "arabic" || detectScript(headline) === "mixed";
+    out.push(`Text: only "${headline}", big and bold${ar ? ", written correctly in Arabic (right-to-left, connected letters)" : ""}${creator.typography?.trim() ? ` — ${shortLine(creator.typography)}` : ""}. Never over the face.`);
+  } else if (options.textMode === "space") {
+    out.push(`Text: none — leave clean space on the ${options.subjectPosition === "left" ? "right" : options.subjectPosition === "right" ? "left" : "top"} for a title added later.`);
+  } else out.push("Text: no additional text.");
+
+  const custom = toRules(options.customInstructions);
+  if (custom.length) out.push(custom.join(". ") + ".");
+
+  const avoid = ["changing the face", "extra people", "fake or garbled text and logos", "clutter", ...toRules(creator.styleDna.constraints.rules), ...toRules(creator.negative)];
+  out.push(`Avoid: ${avoid.join(", ")}.`);
+
+  const prompt = out.join("\n\n").trim() + "\n";
+  return {
+    prompt,
+    attachments,
+    manifest: buildManifest(creator, preset ?? null, options, attachments),
+    warnings,
+    stats: { characters: prompt.length, words: prompt.split(/\s+/).filter(Boolean).length, sections: out.length },
+  };
+}
+
+function baseWarnings(options: CompilerOptions, attachments: AttachmentItem[], hasIdentity: boolean) {
+  const w: string[] = [];
+  if (!options.concept.trim()) w.push("No video concept entered.");
+  if (!hasIdentity) w.push("No face or expression photo selected — ChatGPT cannot preserve the creator's identity without one.");
+  const faces = attachments.filter((a) => a.kind === "face" || a.kind === "expression");
+  if (faces.length >= 2) w.push(`${faces.length} images are marked as Face/Expression — make sure every one of them is a photo of the creator (cards and props belong in "Other asset").`);
+  if (attachments.length > 10) w.push("More than 10 images selected; ChatGPT may ignore some attachments. Consider trimming.");
+  if (options.textMode === "render" && !options.headline?.trim()) w.push("Text mode is 'Render headline' but the headline is empty.");
+  return w;
+}
+
+// ---------------------------------------------------------------------------
+// Detailed structured spec
+
+function compileDetailed(input: CompileInput): CompileOutput {
   const { creator, preset, options } = input;
   const warnings: string[] = [];
   const v = options.variation;
