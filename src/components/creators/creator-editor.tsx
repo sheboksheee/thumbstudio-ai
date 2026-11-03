@@ -1,8 +1,8 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Dna, Images, Layers, Loader2, Lock, LockOpen, Save, Trash2, User, Wand2 } from "lucide-react";
+import { Check, Dna, Images, Layers, Loader2, Lock, LockOpen, Save, Trash2, User, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input, Label, NativeSelect, Textarea } from "@/components/ui/input";
@@ -59,10 +59,16 @@ export function CreatorEditor({ creator, assets, presets, initialTab }: { creato
 
   const set = <K extends keyof Profile>(k: K, v: Profile[K]) => setProfile((p) => ({ ...p, [k]: v }));
 
-  async function save() {
+  async function save(silent = false) {
     if (!profile.name.trim()) {
-      toast.error("Creator name is required");
-      setTab("profile");
+      if (!silent) {
+        toast.error("Creator name is required");
+        setTab("profile");
+      }
+      return;
+    }
+    if (!isNew && !dirty) {
+      if (!silent) toast.success("All changes are saved");
       return;
     }
     setSaving(true);
@@ -73,7 +79,7 @@ export function CreatorEditor({ creator, assets, presets, initialTab }: { creato
         router.push(`/creators/edit?id=${c.id}&tab=assets`);
       } else {
         await updateCreator(creator.id, { ...profile, styleDna: dna });
-        toast.success("Creator saved");
+        if (!silent) toast.success("Creator saved");
       }
     } catch (e) {
       toast.error((e as Error).message);
@@ -81,6 +87,46 @@ export function CreatorEditor({ creator, assets, presets, initialTab }: { creato
       setSaving(false);
     }
   }
+
+  // Autosave: existing creators save themselves ~0.7s after the last change.
+  const latest = useRef({ profile, dna, dirty });
+  latest.current = { profile, dna, dirty };
+  useEffect(() => {
+    if (isNew || !dirty || !profile.name.trim()) return;
+    const t = setTimeout(() => void save(true), 700);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile, dna, dirty, isNew]);
+
+  // Flush pending edits when leaving the page; warn if the tab is closed mid-save.
+  useEffect(() => {
+    if (isNew || !creator) return;
+    const id = creator.id;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (latest.current.dirty) {
+        void updateCreator(id, { ...latest.current.profile, styleDna: latest.current.dna });
+        e.preventDefault();
+      }
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => {
+      window.removeEventListener("beforeunload", onBeforeUnload);
+      const l = latest.current;
+      if (l.dirty && l.profile.name.trim()) void updateCreator(id, { ...l.profile, styleDna: l.dna });
+    };
+  }, [isNew, creator?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ⌘S / Ctrl+S
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        void save();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
 
   async function remove() {
     if (!creator) return;
@@ -105,14 +151,16 @@ export function CreatorEditor({ creator, assets, presets, initialTab }: { creato
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
               <h1 className="truncate text-2xl font-semibold tracking-tight">{profile.name || "Untitled"}</h1>
-              {dirty && <Badge tone="warning">Unsaved</Badge>}
+              {dirty && profile.name.trim() ? <Badge tone="outline">Saving…</Badge> : null}
             </div>
             <div className="text-sm text-muted-foreground" dir="auto">{profile.channelName}{profile.niche ? ` · ${profile.niche}` : ""}</div>
           </div>
           <div className="flex items-center gap-2">
             <Button variant="ghost" onClick={remove} className="text-muted-foreground hover:text-destructive"><Trash2 /> Delete</Button>
             <Button variant="secondary" asChild><Link href={`/studio?creator=${creator.id}`}><Wand2 /> Open in Studio</Link></Button>
-            <Button onClick={save} disabled={saving || !dirty}>{saving ? <Loader2 className="animate-spin" /> : <Save />} Save</Button>
+            <Button onClick={() => save()} variant={dirty ? "default" : "secondary"} title="Changes save automatically · ⌘S">
+              {!profile.name.trim() ? <><Save /> Name required</> : saving || dirty ? <><Loader2 className="animate-spin" /> Saving…</> : <><Check className="text-success" /> Saved</>}
+            </Button>
           </div>
         </div>
       )}
@@ -176,7 +224,7 @@ export function CreatorEditor({ creator, assets, presets, initialTab }: { creato
                 Every field is plain text you control. The prompt compiler turns each line into a rule — nothing is inferred by AI.
               </Card>
               {isNew && (
-                <Button className="w-full" size="lg" onClick={save} disabled={saving}>
+                <Button className="w-full" size="lg" onClick={() => save()} disabled={saving}>
                   {saving ? <Loader2 className="animate-spin" /> : <Save />} Create creator
                 </Button>
               )}
@@ -186,7 +234,7 @@ export function CreatorEditor({ creator, assets, presets, initialTab }: { creato
 
         <TabsContent value="dna">
           <DnaEditor dna={dna} onChange={setDna} />
-          {isNew && <Button className="mt-6" size="lg" onClick={save} disabled={saving}>{saving ? <Loader2 className="animate-spin" /> : <Save />} Create creator</Button>}
+          {isNew && <Button className="mt-6" size="lg" onClick={() => save()} disabled={saving}>{saving ? <Loader2 className="animate-spin" /> : <Save />} Create creator</Button>}
         </TabsContent>
 
         {!isNew && (
