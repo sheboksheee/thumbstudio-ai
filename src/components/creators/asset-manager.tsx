@@ -12,7 +12,7 @@ import type { AssetDTO, CreatorDTO } from "@/lib/types";
 import { deleteAsset, updateAsset, updateCreator, uploadAssets } from "@/lib/store";
 import { cn } from "@/lib/utils";
 
-export const PRIORITY_LABELS: Record<number, string> = { 1: "1 · Primary", 2: "2 · High", 3: "3 · Normal", 4: "4 · Low", 5: "5 · Optional" };
+export const PRIORITY_LABELS: Record<number, string> = { 1: "١ · الأساسية", 2: "٢ · مهمة", 3: "٣ · عادي", 4: "٤ · قليلة", 5: "٥ · اختياري" };
 
 export function AssetManager({ creator, assets }: { creator: CreatorDTO; assets: AssetDTO[] }) {
   const [busyKind, setBusyKind] = useState<string | null>(null);
@@ -23,7 +23,7 @@ export function AssetManager({ creator, assets }: { creator: CreatorDTO; assets:
     setBusyKind(kind);
     try {
       await uploadAssets(creator.id, kind, files);
-      toast.success(`${files.length} image${files.length > 1 ? "s" : ""} uploaded`);
+      toast.success(files.length > 1 ? `اترفعت ${files.length} صور` : "الصورة اترفعت");
     } catch (e) {
       toast.error((e as Error).message);
     } finally {
@@ -38,8 +38,8 @@ export function AssetManager({ creator, assets }: { creator: CreatorDTO; assets:
     <div className="space-y-8">
       {allTags.length > 0 && (
         <div className="flex flex-wrap items-center gap-1.5">
-          <span className="label-xs mr-1">Filter by tag</span>
-          <button onClick={() => setTagFilter("")} className={cn("rounded-md px-2 py-1 text-xs", !tagFilter ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground")}>All</button>
+          <span className="label-xs me-1">فلتر بالتاج</span>
+          <button onClick={() => setTagFilter("")} className={cn("rounded-md px-2 py-1 text-xs", !tagFilter ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground")}>الكل</button>
           {allTags.map((t) => (
             <button key={t} onClick={() => setTagFilter(t === tagFilter ? "" : t)} className={cn("rounded-md px-2 py-1 text-xs", tagFilter === t ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground")}>#{t}</button>
           ))}
@@ -51,7 +51,7 @@ export function AssetManager({ creator, assets }: { creator: CreatorDTO; assets:
           <section key={k.value}>
             <div className="mb-3 flex items-baseline justify-between">
               <div>
-                <h3 className="text-sm font-semibold">{k.label} <span className="ml-1 font-normal text-muted-foreground">{list.length}</span></h3>
+                <h3 className="text-sm font-semibold">{k.label} <span className="ms-1 font-normal text-muted-foreground">{list.length}</span></h3>
                 <p className="text-xs text-muted-foreground">{k.desc}</p>
               </div>
             </div>
@@ -62,7 +62,7 @@ export function AssetManager({ creator, assets }: { creator: CreatorDTO; assets:
               <Dropzone
                 compact={list.length > 0}
                 busy={busyKind === k.value}
-                title={list.length ? `Add ${k.label.toLowerCase()}` : `Drop ${k.label.toLowerCase()} images`}
+                title={list.length ? "ضيف صورة" : `حط صور ${k.label} هنا`}
                 onFiles={(f) => upload(k.value, f)}
                 className={cn(k.value === "reference" ? "aspect-video" : "aspect-[4/5]", list.length === 0 && "col-span-full aspect-auto")}
               />
@@ -101,10 +101,10 @@ function AssetCard({ asset, creator, onPreview, wide }: { asset: AssetDTO; creat
   }
 
   async function del() {
-    if (!confirm("Delete this image?")) return;
+    if (!confirm("تمسح الصورة دي؟")) return;
     try {
       await deleteAsset(asset.id);
-      toast.success("Image deleted");
+      toast.success("الصورة اتمسحت");
     } catch (e) {
       toast.error((e as Error).message);
     }
@@ -113,7 +113,7 @@ function AssetCard({ asset, creator, onPreview, wide }: { asset: AssetDTO; creat
   async function setAs(field: "avatarAssetId" | "logoAssetId") {
     try {
       await updateCreator(creator.id, { [field]: asset.id });
-      toast.success(field === "avatarAssetId" ? "Set as avatar" : "Set as logo");
+      toast.success(field === "avatarAssetId" ? "بقت صورة البروفايل" : "بقت اللوجو");
     } catch (e) {
       toast.error((e as Error).message);
     }
@@ -127,31 +127,31 @@ function AssetCard({ asset, creator, onPreview, wide }: { asset: AssetDTO; creat
       <div className={cn("checker relative overflow-hidden", wide ? "aspect-video" : "aspect-[4/5]")}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={asset.url} alt={a.label} className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]" />
-        <div className="absolute left-2 top-2 flex gap-1">
-          {a.priority === 1 && <Badge tone="primary" className="bg-black/70 backdrop-blur"><Star className="h-3 w-3 fill-current" /> Primary</Badge>}
-          {isAvatar && <Badge className="bg-black/70 backdrop-blur">Avatar</Badge>}
-          {isLogo && <Badge className="bg-black/70 backdrop-blur">Logo</Badge>}
+        <div className="absolute bottom-2 start-2 flex gap-1">
+          {a.priority === 1 && <Badge tone="primary" className="bg-black/70 backdrop-blur"><Star className="h-3 w-3 fill-current" /> الأساسية</Badge>}
+          {isAvatar && <Badge className="bg-black/70 backdrop-blur">البروفايل</Badge>}
+          {isLogo && <Badge className="bg-black/70 backdrop-blur">اللوجو</Badge>}
         </div>
-        <div className="absolute right-2 top-2 flex gap-1 opacity-0 transition group-hover:opacity-100">
-          <Button size="icon-sm" variant="secondary" onClick={onPreview} title="Preview"><Expand /></Button>
-          <Button size="icon-sm" variant="secondary" onClick={() => setAs("avatarAssetId")} title="Use as creator avatar"><Crown /></Button>
-          <Button size="icon-sm" variant="destructive" onClick={del} title="Delete"><Trash2 /></Button>
+        <div className="absolute end-2 top-2 flex gap-1 transition md:opacity-0 md:group-hover:opacity-100">
+          <Button size="icon-sm" variant="secondary" onClick={onPreview} title="كبّر"><Expand /></Button>
+          <Button size="icon-sm" variant="secondary" onClick={() => setAs("avatarAssetId")} title="خليها صورة البروفايل"><Crown /></Button>
+          <Button size="icon-sm" variant="destructive" onClick={del} title="امسح"><Trash2 /></Button>
         </div>
       </div>
       <div className="space-y-1.5 p-2.5">
-        <input className="w-full bg-transparent text-xs font-medium outline-none placeholder:text-muted-foreground" dir="auto" value={a.label} placeholder="Label" onChange={(e) => setA({ ...a, label: e.target.value })} onBlur={(e) => e.target.value !== asset.label && patch({ label: e.target.value })} />
-        <Input className="h-7 text-[11px]" placeholder="Purpose (sent with prompt)" value={a.purpose} onChange={(e) => setA({ ...a, purpose: e.target.value })} onBlur={(e) => e.target.value !== asset.purpose && patch({ purpose: e.target.value })} />
+        <input className="w-full bg-transparent text-xs font-medium outline-none placeholder:text-muted-foreground" dir="auto" value={a.label} placeholder="اسم الصورة" onChange={(e) => setA({ ...a, label: e.target.value })} onBlur={(e) => e.target.value !== asset.label && patch({ label: e.target.value })} />
+        <Input className="h-7 text-[11px]" placeholder="دي إيه؟ (اختياري — بتتكتب في البرومبت)" value={a.purpose} onChange={(e) => setA({ ...a, purpose: e.target.value })} onBlur={(e) => e.target.value !== asset.purpose && patch({ purpose: e.target.value })} />
         <div className="flex gap-1.5">
-          <Input className="h-7 min-w-0 flex-1 text-[11px]" placeholder="tags, comma, separated" value={a.tags} onChange={(e) => setA({ ...a, tags: e.target.value })} onBlur={(e) => e.target.value !== asset.tags && patch({ tags: e.target.value })} />
-          <NativeSelect className="h-7 w-[92px] pl-2 pr-6 text-[11px]" value={a.priority} onChange={(e) => patch({ priority: Number(e.target.value) })} title="Reference priority">
+          <Input className="h-7 min-w-0 flex-1 text-[11px]" placeholder="تاجز، بفاصلة" value={a.tags} onChange={(e) => setA({ ...a, tags: e.target.value })} onBlur={(e) => e.target.value !== asset.tags && patch({ tags: e.target.value })} />
+          <NativeSelect className="h-7 w-[92px] ps-2 pe-6 text-[11px]" value={a.priority} onChange={(e) => patch({ priority: Number(e.target.value) })} title="الأهمية">
             {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{PRIORITY_LABELS[n]}</option>)}
           </NativeSelect>
         </div>
-        <NativeSelect className="h-7 pl-2 pr-6 text-[11px]" value={a.kind} onChange={(e) => patch({ kind: e.target.value })} title="Image type — tells the prompt what this image is">
-          {ASSET_KINDS.map((k) => <option key={k.value} value={k.value}>Type: {k.label}</option>)}
+        <NativeSelect className="h-7 ps-2 pe-6 text-[11px]" value={a.kind} onChange={(e) => patch({ kind: e.target.value })} title="نوع الصورة — بيعرّف ChatGPT الصورة دي إيه">
+          {ASSET_KINDS.map((k) => <option key={k.value} value={k.value}>النوع: {k.label}</option>)}
         </NativeSelect>
         {a.kind === "logo" && !isLogo && (
-          <button className="text-[11px] text-primary hover:underline" onClick={() => setAs("logoAssetId")}>Set as main logo</button>
+          <button className="text-[11px] text-primary hover:underline" onClick={() => setAs("logoAssetId")}>خليه اللوجو الأساسي</button>
         )}
       </div>
     </Card>

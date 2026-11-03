@@ -1,56 +1,56 @@
 export const SUBJECT_POSITIONS = [
-  { value: "left", label: "Left" },
-  { value: "center", label: "Center" },
-  { value: "right", label: "Right" },
+  { value: "right", label: "يمين" },
+  { value: "center", label: "النص" },
+  { value: "left", label: "شمال" },
 ] as const;
 
 export const SUBJECT_SCALES = [
-  { value: "medium", label: "Medium", desc: "waist-up, ~45% of frame height" },
-  { value: "large", label: "Large", desc: "chest-up, ~70% of frame height" },
-  { value: "xl", label: "Extra large", desc: "head-and-shoulders, ~90% of frame height" },
-  { value: "closeup", label: "Close-up", desc: "face fills the frame side, cropped at the edge" },
+  { value: "medium", label: "متوسط", desc: "من الوسط لفوق" },
+  { value: "large", label: "كبير", desc: "من الصدر لفوق" },
+  { value: "xl", label: "كبير جداً", desc: "الراس والكتاف" },
+  { value: "closeup", label: "كلوز", desc: "الوش مالي الجنب" },
 ] as const;
 
 export const TEXT_MODES = [
-  { value: "none", label: "No text" },
-  { value: "render", label: "Render headline" },
-  { value: "space", label: "Leave text space" },
+  { value: "none", label: "من غير كتابة" },
+  { value: "render", label: "اكتب عنوان" },
+  { value: "space", label: "سيب مكان للعنوان" },
 ] as const;
 
 export const COLOR_MOODS = [
-  { value: "creator", label: "Creator palette" },
-  { value: "warm", label: "Warm / golden" },
-  { value: "cold", label: "Cold / icy" },
-  { value: "neon", label: "Neon / electric" },
-  { value: "dark", label: "Dark dramatic" },
-  { value: "highkey", label: "Bright high-key" },
-  { value: "custom", label: "Custom" },
+  { value: "creator", label: "ألوان القناة" },
+  { value: "warm", label: "دافي / دهبي" },
+  { value: "cold", label: "بارد / تلجي" },
+  { value: "neon", label: "نيون" },
+  { value: "dark", label: "غامق ودرامي" },
+  { value: "highkey", label: "فاتح ونضيف" },
+  { value: "custom", label: "مخصص" },
 ] as const;
 
 export const REFERENCE_PRIORITIES = [
-  { value: "identity", label: "Identity first", desc: "Faces and logos are sacred; style refs are loose inspiration." },
-  { value: "balanced", label: "Balanced", desc: "Exact identity, close adherence to style references." },
-  { value: "style", label: "Match references", desc: "Replicate the reference thumbnails' layout and grading closely." },
+  { value: "identity", label: "الوش أهم", desc: "المراجع إلهام بس" },
+  { value: "balanced", label: "متوازن", desc: "" },
+  { value: "style", label: "قلّد المراجع", desc: "نفس ستايل الثمبنيلات القديمة" },
 ] as const;
 
 export const VARIATIONS = [
-  { value: "safe", label: "Safe", desc: "On-brand, proven layout, minimal risk." },
-  { value: "creative", label: "Creative", desc: "Bolder concept within the brand system." },
-  { value: "experimental", label: "Experimental", desc: "Push the visual idea; only locked DNA is fixed." },
+  { value: "safe", label: "آمن", desc: "ستايل القناة المعتاد." },
+  { value: "creative", label: "إبداعي", desc: "فكرة أجرأ بنفس الهوية." },
+  { value: "experimental", label: "تجريبي", desc: "حاجة غير متوقعة تمامًا." },
 ] as const;
 
 export const PROMPT_STYLES = [
-  { value: "concise", label: "Short", desc: "Short, natural brief — usually gives ChatGPT the best results." },
-  { value: "detailed", label: "Detailed", desc: "Full structured spec with every rule spelled out." },
+  { value: "concise", label: "مختصر", desc: "برومبت قصير وواضح — غالبًا بيدي أحسن نتيجة." },
+  { value: "detailed", label: "مفصّل", desc: "كل القواعد مكتوبة بالتفصيل." },
 ] as const;
 
 export const ASSET_KINDS = [
-  { value: "face", label: "Face", desc: "Identity photos of the creator" },
-  { value: "expression", label: "Expression", desc: "Emotion / expression photography" },
-  { value: "reference", label: "Thumbnail ref", desc: "Past thumbnails that define the style" },
-  { value: "logo", label: "Logo", desc: "Channel or brand logo" },
-  { value: "avatar", label: "Avatar", desc: "Channel avatar" },
-  { value: "asset", label: "Other asset", desc: "Props, game assets, cut-outs" },
+  { value: "face", label: "وش الكريتور", desc: "صور واضحة لوش الكريتور" },
+  { value: "expression", label: "تعبيرات", desc: "صور بتعبيرات مختلفة (صدمة، فرحة…)" },
+  { value: "asset", label: "كروت وعناصر", desc: "كروت لاعيبة، بكجات، أي عنصر يظهر في التصميم" },
+  { value: "reference", label: "ثمبنيلات مرجعية", desc: "ثمبنيلات قديمة بتعبّر عن ستايل القناة" },
+  { value: "logo", label: "لوجو", desc: "لوجو القناة" },
+  { value: "avatar", label: "صورة القناة", desc: "الأفاتار" },
 ] as const;
 
 export type SubjectPosition = (typeof SUBJECT_POSITIONS)[number]["value"];
@@ -62,11 +62,25 @@ export type Variation = (typeof VARIATIONS)[number]["value"];
 export type AssetKind = (typeof ASSET_KINDS)[number]["value"];
 
 export const RESULT_STATUSES = [
-  { value: "pending", label: "Pending" },
-  { value: "approved", label: "Approved" },
-  { value: "revision", label: "Needs revision" },
-  { value: "rejected", label: "Rejected" },
+  { value: "pending", label: "لسه" },
+  { value: "approved", label: "معتمد" },
+  { value: "revision", label: "محتاج تعديل" },
+  { value: "rejected", label: "مرفوض" },
 ] as const;
+
+/** Arabic display names for the built-in presets (stored names stay English for the prompt). */
+export const PRESET_LABELS_AR: Record<string, string> = {
+  "eafc-pack-opening": "تفتيح بكجات",
+  "eafc-player-review": "مراجعة لاعب",
+  "eafc-tactical-guide": "شرح خطة",
+  "eafc-fut-champions": "FUT Champions",
+  "eafc-squad-builder": "بناء تشكيلة",
+  "eafc-hero-icon-reveal": "كشف أيقونة / هيرو",
+};
+
+export function presetLabel(p: { slug: string; name: string }) {
+  return PRESET_LABELS_AR[p.slug] ?? p.name;
+}
 
 export function labelOf<T extends { value: string; label: string }>(list: readonly T[], v: string) {
   return list.find((x) => x.value === v)?.label ?? v;

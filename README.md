@@ -37,22 +37,18 @@ Everything is stored **in your browser** (IndexedDB) on the device you're using.
 
 The workflow sets the correct base path automatically (`/<repo-name>`, or none for a `<username>.github.io` repository). GitHub Pages on a free account requires a **public** repository.
 
-## The workflow
+## طريقة الاستخدام (The workflow)
 
-**Select creator → enter video concept → select preset → attach assets → generate prompt → open ChatGPT → import the result**
+١. **اختار الكريتور.** أول مرة: من «الكريتورز» اعمل كريتور جديد، وارفع صورة واضحة لوشه في «وش الكريتور».
+٢. **اكتب فكرة الفيديو** بالعربي أو الإنجليزي. البرنامج بيتعرّف على نوع الفيديو لوحده (تفتيح بكجات، كرت، تطوير، شامبيونز، تشكيلة، خطط، أيقونات، كوينز…)، وتقدر تختار النوع بنفسك.
+٣. **ضيف صورة الكرت أو العنصر** من «ضيف كرت أو عنصر».
+٤. **دوس «انسخ وافتح ChatGPT»**: البرومبت بيتنسخ وChatGPT بيتفتح.
+٥. **ارفع الصور في ChatGPT بنفس الترتيب** (زرار «احفظ الصور على الجهاز» بيحفظهم على الموبايل)، والصق البرومبت وابعت.
+٦. **رجّع التصميم** في الخطوة ٣ (اسحب الصورة، أو اختارها، أو الصقها)، وهتلاقيه في «النتايج» للتقييم والمقارنة والتصدير بمقاس ١٢٨٠×٧٢٠.
 
-1. **Creators.** Create a profile with name, channel, palette, typography, background, retouching, lighting, composition rules, negative instructions and a master prompt. Upload face photos, expression photos, logos, avatars and past thumbnails by drag and drop. Give each image a label, tags, a **priority** (1 = primary to 5 = optional) and a **purpose**; the purpose is quoted in the prompt.
-2. **Style DNA.** Fill in up to eleven categories: color grading, composition, subject placement, face treatment, visual hierarchy, lighting, background complexity, depth and effects, text treatment, game or niche assets, and creative constraints. Write one rule per line. **Lock** a category to make it core identity, which is then enforced in every variation.
-3. **Studio.** Pick a creator, then write the concept in English or Arabic. Choose a preset, and set the text mode (none, exact headline, or leave space for text), subject position and scale, color mood, background, reference priority and custom notes. Then pick the assets. The compiled prompt updates live, and you can switch between **Safe**, **Creative** and **Experimental** variations or edit the prompt by hand.
-4. **Copy Prompt & Open ChatGPT.** This button copies the full prompt, opens ChatGPT in a new tab and saves the project. It also opens a checklist of the images to attach, in numbered order. You can tick each image off, download them all as numbered files, or copy a short asset manifest. **Images are never uploaded automatically.**
-5. **Import.** Download or copy the image from ChatGPT, then drop it into the checklist (or press ⌘V / Ctrl+V). It is stored together with its creator, concept, prompt, preset, variation and the snapshot of references used.
-6. **Library.** Filter by creator, preset, status, rating or text. Set the approval status, give star ratings and write feedback. You can also:
-   - import **revisions** (v2, v3, …),
-   - **compare** two thumbnails side by side or with a slider,
-   - preview the image with 16:9 safe areas and at real YouTube feed sizes,
-   - **export** an exact **1280×720** JPG (kept under 2 MB) or PNG, by crop or letterbox with a chosen anchor.
+The default **short prompt** is concept-first and topic-aware: it detects the video topic from the idea (Arabic + English keywords) and builds an on-theme EA FC scene: pack walkout tunnel, the card as the hero object, tactics board, Champions arena, and so on. It also picks a fitting reaction and describes each attached image by its role. The **detailed** mode (Advanced options) still produces the full structured spec.
 
-### Prompt structure (priority order)
+### Detailed prompt structure (priority order)
 
 1. Creator identity and face preservation
 2. Attached original assets (numbered to match the checklist)

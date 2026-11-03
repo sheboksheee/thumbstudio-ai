@@ -314,7 +314,7 @@ function compileConcise(input: CompileInput): CompileOutput {
     assetId: a.id,
     kind: a.kind,
     label: a.label?.trim() || `${a.kind} image`,
-    role: a.purpose?.trim() || conciseRole(a, who, options.referencePriority),
+    role: conciseRole(a, who, options.referencePriority) + (a.purpose?.trim() ? ` (${a.purpose.trim()})` : ""),
     purpose: a.purpose?.trim() || "",
   }));
   const hasIdentity = attachments.some((a) => a.kind === "face" || a.kind === "expression");

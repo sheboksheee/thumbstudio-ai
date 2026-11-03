@@ -81,6 +81,7 @@ export interface ProjectRecord {
   customInstructions: string;
   variation: string;
   promptStyle?: string;
+  sceneId?: string;
   selectedAssetIds: string[];
   compiledPrompt: string;
   createdAt: string;
@@ -139,6 +140,7 @@ export interface AppSettings {
   exportFormat: string;
   exportFit: string;
   promptStyle: string;
+  gameName: string;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -148,4 +150,5 @@ export const DEFAULT_SETTINGS: AppSettings = {
   exportFormat: "jpg",
   exportFit: "cover",
   promptStyle: "concise",
+  gameName: "EA FC 27",
 };

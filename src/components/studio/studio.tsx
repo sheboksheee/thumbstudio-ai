@@ -3,26 +3,25 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  AlertTriangle, AlignCenter, AlignLeft, AlignRight, Check, ClipboardCopy, ExternalLink, FileText, FilePlus2, History,
-  Languages, Loader2, Pencil, RotateCcw, Save, Sparkles, Type, Users, Wand2, Zap,
+  AlignCenter, AlignLeft, AlignRight, Check, ChevronDown, ClipboardCopy, Download, ExternalLink, FilePlus2,
+  Images, Pencil, Plus, RotateCcw, Sparkles, Upload, Users, Wand2, X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input, Label, NativeSelect, Textarea } from "@/components/ui/input";
-import { Badge, Card, EmptyState, Segmented } from "@/components/ui/misc";
+import { Card, EmptyState, Segmented } from "@/components/ui/misc";
+import { Dropzone } from "@/components/ui/dropzone";
 import { CreatorAvatar } from "@/components/creator-avatar";
 import { AssetPicker, autoSelect } from "./asset-picker";
-import { ChatGPTDialog } from "./chatgpt-dialog";
-import { compilePrompt, detectScript, type CompilerOptions } from "@/lib/prompt/compiler";
-import { COLOR_MOODS, PROMPT_STYLES, REFERENCE_PRIORITIES, SUBJECT_SCALES, VARIATIONS, type Variation } from "@/lib/options";
-import type { PromptStyle } from "@/lib/prompt/compiler";
+import { compilePrompt, type CompilerOptions, type PromptStyle } from "@/lib/prompt/compiler";
+import { GENERIC_SCENE, SCENES, detectScenes } from "@/lib/prompt/scenes";
+import { COLOR_MOODS, PROMPT_STYLES, REFERENCE_PRIORITIES, SUBJECT_SCALES, VARIATIONS, presetLabel, type Variation } from "@/lib/options";
 import type { AppSettings, AssetDTO, CreatorWithCounts, PresetDTO, ProjectWithCount } from "@/lib/types";
-import { saveProject as storeSaveProject } from "@/lib/store";
+import { importResult, saveProject as storeSaveProject, uploadAssets } from "@/lib/store";
 import { BASE_PATH } from "@/lib/hooks";
 import { copyText, copyTextSync } from "@/lib/clipboard";
+import { safeName } from "@/lib/image-export";
 import { cn, timeAgo } from "@/lib/utils";
-
-type Project = ProjectWithCount;
 
 interface FormState {
   projectId: string | null;
@@ -32,7 +31,7 @@ interface FormState {
   selected: string[];
 }
 
-const DEFAULT_OPTIONS = (s: AppSettings): CompilerOptions => ({
+const defaults = (s: AppSettings): CompilerOptions => ({
   concept: "",
   textMode: "none",
   headline: "",
@@ -45,7 +44,11 @@ const DEFAULT_OPTIONS = (s: AppSettings): CompilerOptions => ({
   customInstructions: "",
   variation: (s.defaultVariation as Variation) || "safe",
   promptStyle: (s.promptStyle as PromptStyle) || "concise",
+  sceneId: "auto",
+  gameName: s.gameName || "EA FC 27",
 });
+
+const KIND_SHORT: Record<string, string> = { face: "الوش", expression: "تعبير", asset: "كرت / عنصر", reference: "مرجع", logo: "لوجو", avatar: "أفاتار" };
 
 export function Studio({
   creators, presets, assets, projects, settings, projectParam, creatorParam,
@@ -53,7 +56,7 @@ export function Studio({
   creators: CreatorWithCounts[];
   presets: PresetDTO[];
   assets: AssetDTO[];
-  projects: Project[];
+  projects: ProjectWithCount[];
   settings: AppSettings;
   projectParam?: string;
   creatorParam?: string;
@@ -63,6 +66,7 @@ export function Studio({
   const stateFor = useCallback(
     (projId?: string | null, creatorHint?: string | null): FormState => {
       const p = projId ? projects.find((x) => x.id === projId) : undefined;
+      const base = defaults(settings);
       if (p) {
         return {
           projectId: p.id,
@@ -70,6 +74,7 @@ export function Studio({
           presetId: p.presetId,
           selected: p.selectedAssetIds,
           opts: {
+            ...base,
             concept: p.concept,
             textMode: p.textMode as CompilerOptions["textMode"],
             headline: p.headline,
@@ -81,12 +86,14 @@ export function Studio({
             referencePriority: p.referencePriority as CompilerOptions["referencePriority"],
             customInstructions: p.customInstructions,
             variation: p.variation as Variation,
-            promptStyle: ((p.promptStyle as PromptStyle) || "concise"),
+            promptStyle: (p.promptStyle as PromptStyle) || base.promptStyle,
+            sceneId: p.sceneId || "auto",
           },
         };
       }
-      const cid = (creatorHint && creators.some((c) => c.id === creatorHint) ? creatorHint : null) ?? (creators.length === 1 ? creators[0].id : null);
-      return { projectId: null, creatorId: cid, presetId: null, selected: cid ? autoSelect(assets.filter((a) => a.creatorId === cid)) : [], opts: DEFAULT_OPTIONS(settings) };
+      const valid = creatorHint && creators.some((c) => c.id === creatorHint) ? creatorHint : null;
+      const cid = valid ?? creators[0]?.id ?? null;
+      return { projectId: null, creatorId: cid, presetId: null, selected: cid ? autoSelect(assets.filter((a) => a.creatorId === cid)) : [], opts: base };
     },
     [projects, creators, assets, settings],
   );
@@ -99,35 +106,27 @@ export function Studio({
   const [selected, setSelected] = useState<string[]>(initial.selected);
   const [manualPrompt, setManualPrompt] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [copied, setCopied] = useState<"prompt" | "manifest" | null>(null);
+  const [showPrompt, setShowPrompt] = useState(false);
+  const [showPicker, setShowPicker] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [imported, setImported] = useState<{ id: string; url: string }[]>([]);
 
   const creator = creators.find((c) => c.id === creatorId) ?? null;
   const creatorAssets = useMemo(() => assets.filter((a) => a.creatorId === creatorId), [assets, creatorId]);
   const availablePresets = presets.filter((p) => !p.creatorId || p.creatorId === creatorId);
   const preset = availablePresets.find((p) => p.id === presetId) ?? null;
   const selectedAssets = useMemo(() => selected.map((id) => creatorAssets.find((a) => a.id === id)).filter((a): a is AssetDTO => !!a), [selected, creatorAssets]);
-
   const set = <K extends keyof CompilerOptions>(k: K, v: CompilerOptions[K]) => setOpts((o) => ({ ...o, [k]: v }));
 
-  const compiled = useMemo(() => {
-    if (!creator) return null;
-    return compilePrompt({ creator, preset, assets: selectedAssets, options: opts });
-  }, [creator, preset, selectedAssets, opts]);
-
+  const compiled = useMemo(() => (creator ? compilePrompt({ creator, preset, assets: selectedAssets, options: opts }) : null), [creator, preset, selectedAssets, opts]);
   const finalPrompt = manualPrompt ?? compiled?.prompt ?? "";
+  const detected = useMemo(() => detectScenes(opts.concept), [opts.concept]);
+  const activeScene = opts.sceneId && opts.sceneId !== "auto" ? SCENES.find((s) => s.id === opts.sceneId) : detected[0] ?? GENERIC_SCENE;
+  const byId = useMemo(() => new Map(creatorAssets.map((a) => [a.id, a])), [creatorAssets]);
 
-  // Any input change discards manual prompt edits only if the user confirms via "Recompile";
-  // we keep edits but flag them as stale.
-  const compiledKey = compiled?.prompt ?? "";
-  const [editBase, setEditBase] = useState<string>("");
-  const stale = manualPrompt !== null && editBase !== compiledKey;
-
-  const snapshot = JSON.stringify({ creatorId, presetId, opts, selected, manualPrompt });
-  const snapshotOf = (st: FormState) => JSON.stringify({ creatorId: st.creatorId, presetId: st.presetId, opts: st.opts, selected: st.selected, manualPrompt: null });
-  const [savedSnapshot, setSavedSnapshot] = useState<string>(() => (initial.projectId ? snapshotOf(initial) : ""));
-  const dirty = snapshot !== savedSnapshot;
+  useEffect(() => setSent(false), [finalPrompt]);
 
   const apply = useCallback((st: FormState) => {
     setProjectId(st.projectId);
@@ -137,11 +136,10 @@ export function Studio({
     setSelected(st.selected);
     setManualPrompt(null);
     setEditing(false);
-    setDialogOpen(false);
-    setSavedSnapshot(st.projectId ? JSON.stringify({ creatorId: st.creatorId, presetId: st.presetId, opts: st.opts, selected: st.selected, manualPrompt: null }) : "");
+    setSent(false);
+    setImported([]);
   }, []);
 
-  // Navigating to another project (recent list, dashboard, library) loads it in place.
   useEffect(() => {
     if (projectParam && projectParam !== projectId && projects.some((p) => p.id === projectParam)) apply(stateFor(projectParam));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -155,8 +153,9 @@ export function Studio({
     setManualPrompt(null);
   }
 
-  function pickPreset(p: PresetDTO | null) {
-    setPresetId(p?.id ?? null);
+  function pickPreset(id: string | null) {
+    setPresetId(id);
+    const p = presets.find((x) => x.id === id);
     if (p) {
       setOpts((o) => ({
         ...o,
@@ -168,337 +167,414 @@ export function Studio({
     }
   }
 
-  const saveProject = useCallback(async (silent = false): Promise<string | null> => {
-    if (!creatorId) {
-      toast.error("Select a creator first");
-      return null;
-    }
-    setSaving(true);
+  const saveProject = useCallback(async (): Promise<string | null> => {
+    if (!creatorId) return null;
     try {
       const p = await storeSaveProject(projectId, {
-        creatorId, presetId, ...opts, headline: opts.headline ?? "", colorMoodCustom: opts.colorMoodCustom ?? "",
-        backgroundDirection: opts.backgroundDirection ?? "", customInstructions: opts.customInstructions ?? "",
-        selectedAssetIds: selected, compiledPrompt: finalPrompt, title: opts.concept.slice(0, 90), promptStyle: opts.promptStyle ?? "concise",
+        creatorId, presetId, ...opts,
+        headline: opts.headline ?? "", colorMoodCustom: opts.colorMoodCustom ?? "", backgroundDirection: opts.backgroundDirection ?? "",
+        customInstructions: opts.customInstructions ?? "", promptStyle: opts.promptStyle ?? "concise", sceneId: opts.sceneId ?? "auto",
+        selectedAssetIds: selected, compiledPrompt: finalPrompt, title: opts.concept.slice(0, 90),
       });
       setProjectId(p.id);
-      setSavedSnapshot(snapshot);
-      if (projectParam !== p.id) window.history.replaceState(null, "", `${BASE_PATH}/studio/?project=${p.id}`);
-      if (!silent) toast.success("Project saved");
+      if (projectParam !== p.id) window.history.replaceState(null, "", `${BASE_PATH}/?project=${p.id}`);
       return p.id;
     } catch (e) {
       toast.error((e as Error).message);
       return null;
-    } finally {
-      setSaving(false);
     }
-  }, [creatorId, presetId, opts, selected, finalPrompt, projectId, snapshot, projectParam]);
+  }, [creatorId, presetId, opts, selected, finalPrompt, projectId, projectParam]);
 
-  /** The core Manual Mode action: copy → open ChatGPT → show checklist. */
+  /** Copy synchronously (inside the tap), then open ChatGPT. */
   function copyAndOpen() {
     if (!compiled || !finalPrompt) return;
-    // Copy synchronously so we stay inside the click gesture, then open the tab.
+    if (!opts.concept.trim()) {
+      toast.error("اكتب فكرة الفيديو الأول");
+      return;
+    }
     let ok = copyTextSync(finalPrompt);
     const win = window.open(settings.chatgptUrl || "https://chatgpt.com", "_blank");
     if (win) win.opener = null;
-    if (!ok) {
-      copyText(finalPrompt).then((r) => {
-        ok = r;
-        if (!r) toast.error("Clipboard blocked — use the Copy button in the checklist.");
-      });
-    }
-    if (ok) toast.success("Prompt copied to clipboard");
-    if (!win) toast.message("Popup blocked — use the “Open ChatGPT” link in the checklist.");
-    setDialogOpen(true);
-    void saveProject(true);
+    if (!ok) copyText(finalPrompt).then((r) => { ok = r; if (!r) toast.error("المتصفح منع النسخ — استخدم «انسخ البرومبت بس»"); });
+    if (ok) toast.success("البرومبت اتنسخ — الصقه في ChatGPT مع الصور");
+    if (!win) toast.message("المتصفح منع فتح ChatGPT — دوس على لينك chatgpt.com تحت الزرار");
+    setSent(true);
+    void saveProject();
   }
 
-  async function copy(kind: "prompt" | "manifest") {
-    const text = kind === "prompt" ? finalPrompt : compiled?.manifest ?? "";
-    if (await copyText(text)) {
-      setCopied(kind);
-      toast.success(kind === "prompt" ? "Prompt copied" : "Asset manifest copied");
-      setTimeout(() => setCopied(null), 1600);
-    } else toast.error("Could not access the clipboard");
+  async function copyPrompt() {
+    if (await copyText(finalPrompt)) toast.success("البرومبت اتنسخ");
+    else toast.error("مقدرتش أنسخ — جرب تاني");
+  }
+
+  async function addItem(files: File[]) {
+    if (!creator) return;
+    setUploading(true);
+    try {
+      const created = await uploadAssets(creator.id, "asset", files);
+      setSelected((s) => [...s, ...created.map((a) => a.id)]);
+      toast.success(files.length > 1 ? `اتضافت ${files.length} صور` : "الصورة اتضافت");
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  /** Phone: share sheet → "Save images". Desktop: numbered downloads. */
+  async function saveImages() {
+    const items = compiled?.attachments ?? [];
+    const files: File[] = [];
+    for (const att of items) {
+      const a = byId.get(att.assetId);
+      if (!a) continue;
+      const blob = await (await fetch(a.url)).blob();
+      const ext = (a.mime.split("/")[1] || "png").replace("jpeg", "jpg");
+      files.push(new File([blob], `${String(att.index).padStart(2, "0")}-${att.kind}-${safeName(att.label) || "image"}.${ext}`, { type: a.mime }));
+    }
+    if (!files.length) return;
+    const nav = navigator as Navigator & { canShare?: (d: { files: File[] }) => boolean };
+    if (nav.canShare?.({ files }) && /Mobi|iPhone|iPad|Android/i.test(navigator.userAgent)) {
+      try {
+        await navigator.share({ files, title: "صور الثمبنيل" });
+        return;
+      } catch (e) {
+        if ((e as Error).name === "AbortError") return;
+      }
+    }
+    files.forEach((f, i) =>
+      setTimeout(() => {
+        const url = URL.createObjectURL(f);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = f.name;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 4000);
+      }, i * 300),
+    );
+  }
+
+  async function importFiles(files: File[]) {
+    if (!creator) return;
+    setImporting(true);
+    try {
+      const pid = await saveProject();
+      const refs = (compiled?.attachments ?? []).map((a) => ({ id: a.assetId, label: a.label, kind: a.kind, role: a.role, purpose: a.purpose }));
+      const out: { id: string; url: string }[] = [];
+      for (const f of files) {
+        const r = await importResult({ file: f, creatorId: creator.id, projectId: pid, presetId, concept: opts.concept, prompt: finalPrompt, variation: opts.variation, references: refs });
+        out.push({ id: r.id, url: URL.createObjectURL(f) });
+      }
+      setImported((x) => [...x, ...out]);
+      toast.success("التصميم اتحفظ في النتايج");
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setImporting(false);
+    }
   }
 
   function newProject() {
-    if (dirty && !confirm("Start a new project? Unsaved changes in this one will be lost.")) return;
     apply(stateFor(null, creatorId));
-    router.push(creatorId ? `/studio?creator=${creatorId}` : "/studio");
+    router.push(creatorId ? `/?creator=${creatorId}` : "/");
   }
 
   if (creators.length === 0) {
     return (
-      <div className="p-8">
-        <EmptyState icon={<Users />} title="Create a creator first" action={<Button asChild><Link href="/creators/new">New creator</Link></Button>}>
-          The Studio compiles prompts from a creator&apos;s profile, Style DNA and photography.
+      <div className="p-4 md:p-8">
+        <EmptyState icon={<Users />} title="ضيف كريتور الأول" action={<Button asChild size="lg"><Link href="/creators/new"><Plus /> كريتور جديد</Link></Button>}>
+          اعمل بروفايل للكريتور وارفع صورة واضحة لوشه، وبعدها تقدر تعمل ثمبنيلات في ثواني.
         </EmptyState>
       </div>
     );
   }
 
-  const conceptScript = detectScript(opts.concept);
-  const headlineScript = detectScript(opts.headline ?? "");
-  const creatorProjects = projects.filter((p) => !creatorId || p.creatorId === creatorId).slice(0, 12);
+  const faceCount = creatorAssets.filter((a) => a.kind === "face" || a.kind === "expression").length;
+  const recent = projects.filter((p) => p.creatorId === creatorId).slice(0, 15);
+  const faceWarning = compiled?.warnings.some((w) => w.includes("Face/Expression"));
 
   return (
     <div className="flex min-h-screen flex-col">
       {/* Top bar */}
-      <div className="sticky top-0 z-20 flex items-center gap-3 border-b bg-background/85 px-6 py-3 backdrop-blur">
-        <Wand2 className="h-5 w-5 text-primary" />
-        <div className="text-sm font-semibold">Studio</div>
-        <div className="mx-2 h-4 w-px bg-border" />
-        <div className="min-w-0 flex-1 truncate text-sm text-muted-foreground" dir="auto">
-          {projectId ? <>Project · <span className="text-foreground">{opts.concept.slice(0, 60) || "Untitled"}</span></> : "New project"}
-          {dirty && projectId && <Badge tone="warning" className="ml-2">Unsaved</Badge>}
-        </div>
-        <NativeSelect
-          className="h-8 w-56 text-xs"
-          value=""
-          onChange={(e) => e.target.value && router.push(`/studio?project=${e.target.value}`)}
-          aria-label="Open recent project"
-        >
-          <option value="">Recent projects…</option>
-          {creatorProjects.map((p) => (
-            <option key={p.id} value={p.id}>{(p.title || p.concept || "Untitled").slice(0, 40)} · {timeAgo(p.updatedAt)}</option>
-          ))}
-        </NativeSelect>
-        <Button size="sm" variant="ghost" onClick={newProject}><FilePlus2 /> New</Button>
-        <Button size="sm" variant="secondary" onClick={() => saveProject()} disabled={saving || !creatorId}>{saving ? <Loader2 className="animate-spin" /> : <Save />} Save</Button>
+      <div className="sticky top-0 z-20 flex items-center gap-2 border-b bg-background/85 px-4 py-2.5 backdrop-blur md:px-6">
+        <Wand2 className="h-5 w-5 shrink-0 text-primary" />
+        <div className="min-w-0 flex-1 truncate text-sm font-semibold">{projectId ? opts.concept.slice(0, 50) || "مشروع" : "ثمبنيل جديد"}</div>
+        {recent.length > 0 && (
+          <NativeSelect className="h-8 w-36 text-xs md:w-52" value="" onChange={(e) => e.target.value && router.push(`/?project=${e.target.value}`)} aria-label="آخر المشاريع">
+            <option value="">آخر المشاريع…</option>
+            {recent.map((p) => <option key={p.id} value={p.id}>{(p.title || p.concept || "بدون اسم").slice(0, 40)} · {timeAgo(p.updatedAt)}</option>)}
+          </NativeSelect>
+        )}
+        <Button size="sm" variant="ghost" onClick={newProject}><FilePlus2 /> <span className="hidden sm:inline">جديد</span></Button>
       </div>
 
-      <div className="grid flex-1 gap-0 xl:grid-cols-[minmax(0,1fr)_500px] 2xl:grid-cols-[minmax(0,1fr)_580px]">
-        {/* Builder */}
-        <div className="space-y-5 px-6 py-6">
-          {/* 1. Creator */}
-          <Step n={1} title="Creator" done={!!creator}>
-            <div className="flex gap-2 overflow-x-auto pb-1">
-              {creators.map((c) => (
-                <button
-                  key={c.id}
-                  onClick={() => pickCreator(c.id)}
-                  className={cn(
-                    "flex min-w-[180px] items-center gap-3 rounded-xl border p-2.5 pr-4 text-left transition",
-                    c.id === creatorId ? "border-primary/60 bg-primary/[0.06] glow-ring" : "bg-background/40 hover:border-white/15",
-                  )}
-                >
-                  <CreatorAvatar name={c.name} url={c.avatarUrl} color={c.primaryColor} size={36} />
-                  <div className="min-w-0">
-                    <div className="truncate text-sm font-medium">{c.name}</div>
-                    <div className="truncate text-[11px] text-muted-foreground" dir="auto">{c.channelName}</div>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </Step>
+      <div className="grid flex-1 grid-cols-[minmax(0,1fr)] lg:grid-cols-[minmax(0,1fr)_420px] 2xl:grid-cols-[minmax(0,1fr)_480px]">
+        {/* ------------------------------------------------------------- Brief */}
+        <div className="min-w-0 space-y-4 px-4 py-4 md:px-6 md:py-6">
+          <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+            {creators.map((c) => (
+              <button
+                key={c.id}
+                onClick={() => pickCreator(c.id)}
+                className={cn(
+                  "flex shrink-0 items-center gap-2.5 rounded-2xl border p-2 pe-4 transition",
+                  c.id === creatorId ? "border-primary/60 bg-primary/[0.07] glow-ring" : "bg-panel hover:border-white/15",
+                )}
+              >
+                <CreatorAvatar name={c.name} url={c.avatarUrl} color={c.primaryColor} size={34} />
+                <span className="text-sm font-semibold">{c.name}</span>
+              </button>
+            ))}
+            <Link href="/creators/new" className="flex shrink-0 items-center gap-1.5 rounded-2xl border border-dashed px-4 text-sm text-muted-foreground transition hover:border-primary/50 hover:text-foreground">
+              <Plus className="h-4 w-4" /> كريتور
+            </Link>
+          </div>
 
           {creator && (
             <>
-              {/* 2. Concept */}
-              <Step n={2} title="Video concept" done={!!opts.concept.trim()} right={conceptScript !== "none" && <Badge tone="outline"><Languages className="h-3 w-3" /> {conceptScript === "arabic" ? "Arabic" : conceptScript === "mixed" ? "Arabic + English" : "English"}</Badge>}>
+              <Card className="p-4 md:p-5">
+                <label htmlFor="concept" className="mb-2 block text-base font-bold">الفيديو عن إيه؟</label>
                 <Textarea
-                  rows={2}
-                  className="text-base"
+                  id="concept"
+                  rows={3}
+                  className="resize-none border-white/10 bg-background/40 text-base leading-relaxed md:text-lg"
                   value={opts.concept}
                   onChange={(e) => set("concept", e.target.value)}
-                  placeholder="What is the video about? English or Arabic — e.g. “I opened 50 Icon packs” / “فتحت ٥٠ بكج أيقونة”"
+                  placeholder="مثال: إزاي مالعبتش بالكرت ده من زمان؟ / فتحت ٥٠ بكج أيقونة"
                 />
-              </Step>
-
-              {/* 3. Preset */}
-              <Step n={3} title="Preset" done={!!preset}>
-                <div className="grid grid-cols-2 gap-2 lg:grid-cols-3 2xl:grid-cols-4">
-                  <PresetChip active={!presetId} onClick={() => pickPreset(null)} name="No preset" desc="Creator DNA + concept only" />
-                  {availablePresets.map((p) => (
-                    <PresetChip key={p.id} active={p.id === presetId} onClick={() => pickPreset(p)} name={p.name} desc={p.description} tag={p.creatorId ? "Custom" : p.niche} />
-                  ))}
+                <div className="mt-3">
+                  <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
+                    <span>نوع الفيديو</span>
+                    {opts.sceneId === "auto" && opts.concept.trim() && <span className="text-primary">اتعرّف تلقائي: {activeScene?.label}</span>}
+                  </div>
+                  <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 md:flex-wrap">
+                    <SceneChip active={opts.sceneId === "auto"} onClick={() => set("sceneId", "auto")} label="تلقائي" icon />
+                    {SCENES.map((s) => (
+                      <SceneChip key={s.id} active={opts.sceneId === s.id} onClick={() => set("sceneId", s.id)} label={s.label} hint={opts.sceneId === "auto" && detected[0]?.id === s.id} />
+                    ))}
+                  </div>
                 </div>
-              </Step>
+              </Card>
 
-              {/* 4. Direction */}
-              <Step n={4} title="Creative direction">
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div>
-                    <Label>Text</Label>
-                    <Segmented
-                      value={opts.textMode}
-                      onChange={(v) => set("textMode", v)}
-                      options={[{ value: "none", label: "No text" }, { value: "render", label: "Headline", icon: <Type /> }, { value: "space", label: "Leave space" }]}
-                    />
-                    {opts.textMode === "render" && (
-                      <div className="mt-2">
-                        <Input value={opts.headline} onChange={(e) => set("headline", e.target.value)} placeholder="Exact headline — e.g. 99 PULL / أقوى بكج" className={cn(headlineScript === "arabic" && "text-right text-base")} />
-                        {(headlineScript === "arabic" || headlineScript === "mixed") && <div className="mt-1 text-[11px] text-primary">Arabic headline detected — RTL rendering rules will be added.</div>}
+              <Card className="p-4 md:p-5">
+                <div className="mb-3 flex items-center justify-between">
+                  <div className="text-base font-bold">الصور</div>
+                  <button onClick={() => setShowPicker((v) => !v)} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+                    <Images className="h-3.5 w-3.5" /> {showPicker ? "اقفل" : "اختار من صور الكريتور"}
+                  </button>
+                </div>
+                {faceCount === 0 && (
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-warning/30 bg-warning/[0.06] p-3 text-sm text-warning">
+                    مفيش صورة لوش {creator.name} — ارفع صورة واضحة عشان ChatGPT يحافظ على الشكل.
+                    <Button asChild size="sm" variant="secondary"><Link href={`/creators/edit?id=${creator.id}&tab=assets`}>ارفع صورة الوش</Link></Button>
+                  </div>
+                )}
+                <div className="flex gap-2.5 overflow-x-auto pb-1">
+                  {(compiled?.attachments ?? []).map((att) => {
+                    const a = byId.get(att.assetId);
+                    if (!a) return null;
+                    return (
+                      <div key={att.assetId} className="relative w-24 shrink-0">
+                        <div className="relative aspect-[4/5] overflow-hidden rounded-xl border border-white/10 bg-black">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={a.url} alt={a.label} className="h-full w-full object-cover" />
+                          <span className="absolute start-1.5 top-1.5 flex h-5 min-w-5 items-center justify-center rounded-md bg-primary px-1 font-mono text-[11px] font-bold text-primary-foreground">{att.index}</span>
+                          <button onClick={() => setSelected((s) => s.filter((x) => x !== att.assetId))} className="absolute end-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-md bg-black/70 text-white opacity-80 hover:opacity-100" aria-label="شيل الصورة"><X className="h-3 w-3" /></button>
+                        </div>
+                        <div className="mt-1 truncate text-center text-[11px] text-muted-foreground">{KIND_SHORT[att.kind] ?? att.kind}</div>
                       </div>
-                    )}
+                    );
+                  })}
+                  <Dropzone compact busy={uploading} onFiles={addItem} title="ضيف كرت أو عنصر" className="aspect-[4/5] w-24 shrink-0 p-2" />
+                </div>
+                {faceWarning && (
+                  <div className="mt-3 rounded-xl border border-warning/30 bg-warning/[0.06] p-3 text-xs leading-relaxed text-warning">
+                    فيه أكتر من صورة متسجلة إنها «وش الكريتور». لو واحدة منهم كرت أو عنصر، غيّر نوعها لـ «كروت وعناصر» من صفحة الكريتور ← الصور، عشان ChatGPT ميفتكرهاش وشك.
+                  </div>
+                )}
+                {showPicker && (
+                  <div className="mt-4 border-t pt-4">
+                    <AssetPicker assets={creatorAssets} selected={selected} onChange={setSelected} creatorId={creator.id} />
+                  </div>
+                )}
+              </Card>
+
+              <Card className="grid gap-4 p-4 sm:grid-cols-2 md:p-5">
+                <div>
+                  <Label>مكان {creator.name} في الصورة</Label>
+                  <Segmented
+                    value={opts.subjectPosition}
+                    onChange={(v) => set("subjectPosition", v)}
+                    options={[{ value: "right", label: "يمين", icon: <AlignRight /> }, { value: "center", label: "النص", icon: <AlignCenter /> }, { value: "left", label: "شمال", icon: <AlignLeft /> }]}
+                  />
+                </div>
+                <div>
+                  <Label>الكتابة على الصورة</Label>
+                  <Segmented value={opts.textMode} onChange={(v) => set("textMode", v)} options={[{ value: "none", label: "من غير" }, { value: "render", label: "عنوان" }, { value: "space", label: "سيب مكان" }]} />
+                  {opts.textMode === "render" && (
+                    <Input className="mt-2 text-base" value={opts.headline} onChange={(e) => set("headline", e.target.value)} placeholder="العنوان بالظبط — مثال: أقوى بكج" />
+                  )}
+                </div>
+              </Card>
+
+              <details className="group rounded-xl border bg-panel">
+                <summary className="flex cursor-pointer list-none items-center justify-between p-4 text-sm font-semibold md:px-5">
+                  خيارات متقدمة
+                  <ChevronDown className="h-4 w-4 text-muted-foreground transition group-open:rotate-180" />
+                </summary>
+                <div className="grid gap-4 border-t p-4 sm:grid-cols-2 md:p-5">
+                  <div>
+                    <Label>مستوى الجرأة</Label>
+                    <Segmented value={opts.variation} onChange={(v) => set("variation", v)} options={VARIATIONS.map((v) => ({ value: v.value, label: v.label }))} />
+                    <div className="mt-1 text-[11px] text-muted-foreground">{VARIATIONS.find((v) => v.value === opts.variation)?.desc}</div>
                   </div>
                   <div>
-                    <Label>Subject position</Label>
-                    <Segmented
-                      value={opts.subjectPosition}
-                      onChange={(v) => set("subjectPosition", v)}
-                      options={[{ value: "left", label: "Left", icon: <AlignLeft /> }, { value: "center", label: "Center", icon: <AlignCenter /> }, { value: "right", label: "Right", icon: <AlignRight /> }]}
-                    />
+                    <Label>حجم {creator.name}</Label>
+                    <Segmented size="sm" value={opts.subjectScale} onChange={(v) => set("subjectScale", v)} options={SUBJECT_SCALES.map((s) => ({ value: s.value, label: s.label }))} />
                   </div>
-                  <div>
-                    <Label>Subject scale</Label>
-                    <Segmented value={opts.subjectScale} onChange={(v) => set("subjectScale", v)} options={SUBJECT_SCALES.map((s) => ({ value: s.value, label: s.label }))} size="sm" />
-                  </div>
-                  <div>
-                    <Label>Reference priority</Label>
-                    <Segmented value={opts.referencePriority} onChange={(v) => set("referencePriority", v)} options={REFERENCE_PRIORITIES.map((s) => ({ value: s.value, label: s.label }))} size="sm" />
-                  </div>
-                  <div>
-                    <Label>Color mood</Label>
+                  <div className="sm:col-span-2">
+                    <Label>الألوان</Label>
                     <div className="flex flex-wrap gap-1.5">
                       {COLOR_MOODS.map((m) => (
                         <button key={m.value} onClick={() => set("colorMood", m.value)} className={cn("rounded-lg border px-2.5 py-1.5 text-xs transition", opts.colorMood === m.value ? "border-primary/60 bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground")}>
-                          {m.value === "creator" && <span className="mr-1.5 inline-block h-2 w-2 rounded-full align-middle" style={{ background: creator.primaryColor }} />}
+                          {m.value === "creator" && <span className="me-1.5 inline-block h-2 w-2 rounded-full align-middle" style={{ background: creator.primaryColor }} />}
                           {m.label}
                         </button>
                       ))}
                     </div>
-                    {opts.colorMood === "custom" && <Input className="mt-2" value={opts.colorMoodCustom} onChange={(e) => set("colorMoodCustom", e.target.value)} placeholder="e.g. emerald and black with gold rim light" />}
+                    {opts.colorMood === "custom" && <Input className="mt-2" value={opts.colorMoodCustom} onChange={(e) => set("colorMoodCustom", e.target.value)} placeholder="مثال: أخضر زمردي مع إضاءة دهبي" />}
                   </div>
                   <div>
-                    <Label>Background direction</Label>
-                    <Input value={opts.backgroundDirection} onChange={(e) => set("backgroundDirection", e.target.value)} placeholder={preset?.background ? "Optional — preset background applies" : creator.background || "e.g. blurred stadium at night"} />
+                    <Label>الخلفية (اختياري)</Label>
+                    <Input value={opts.backgroundDirection} onChange={(e) => set("backgroundDirection", e.target.value)} placeholder="سيبها فاضية والبرنامج يختار حسب الموضوع" />
                   </div>
-                  <div className="md:col-span-2">
-                    <Label>Custom instructions</Label>
-                    <Textarea rows={2} value={opts.customInstructions} onChange={(e) => set("customInstructions", e.target.value)} placeholder="One per line — e.g. hold the trophy in the right hand" />
+                  <div>
+                    <Label>قالب</Label>
+                    <NativeSelect value={presetId ?? ""} onChange={(e) => pickPreset(e.target.value || null)}>
+                      <option value="">من غير قالب</option>
+                      {availablePresets.map((p) => <option key={p.id} value={p.id}>{presetLabel(p)}{p.creatorId ? " (مخصص)" : ""}</option>)}
+                    </NativeSelect>
+                  </div>
+                  <div>
+                    <Label>طول البرومبت</Label>
+                    <Segmented value={(opts.promptStyle ?? "concise") as PromptStyle} onChange={(v) => { set("promptStyle", v); setManualPrompt(null); }} options={PROMPT_STYLES.map((p) => ({ value: p.value, label: p.label }))} />
+                  </div>
+                  <div>
+                    <Label>الثمبنيلات المرجعية</Label>
+                    <Segmented size="sm" value={opts.referencePriority} onChange={(v) => set("referencePriority", v)} options={REFERENCE_PRIORITIES.map((s) => ({ value: s.value, label: s.label }))} />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <Label>تعليمات إضافية</Label>
+                    <Textarea rows={2} value={opts.customInstructions} onChange={(e) => set("customInstructions", e.target.value)} placeholder="سطر لكل تعليمة — مثال: ماسك الكرت بإيده اليمين" />
                   </div>
                 </div>
-              </Step>
-
-              {/* 5. Assets */}
-              <Step n={5} title="Attach assets" done={selectedAssets.length > 0} right={<span className="text-xs text-muted-foreground">{selectedAssets.length} selected · attach order is automatic</span>}>
-                <AssetPicker assets={creatorAssets} selected={selected} onChange={setSelected} creatorId={creator.id} />
-              </Step>
+              </details>
             </>
           )}
         </div>
 
-        {/* Output */}
-        <aside className="border-l bg-panel/40 xl:sticky xl:top-[57px] xl:h-[calc(100vh-57px)]">
-          <div className="flex h-full flex-col p-5">
-            <div className="mb-3 flex items-center justify-between">
-              <div className="flex items-center gap-2 text-sm font-semibold"><FileText className="h-4 w-4 text-primary" /> Compiled prompt</div>
-              {compiled && <span className="font-mono text-[11px] text-muted-foreground">{finalPrompt.split(/\s+/).filter(Boolean).length} words · {finalPrompt.length} chars</span>}
-            </div>
-            <div className="mb-2 flex items-center gap-2">
-              <span className="text-[11px] text-muted-foreground">Prompt</span>
-              <Segmented
-                size="sm"
-                value={(opts.promptStyle ?? "concise") as PromptStyle}
-                onChange={(v) => { set("promptStyle", v); setManualPrompt(null); }}
-                options={PROMPT_STYLES.map((p) => ({ value: p.value, label: p.label }))}
-              />
-            </div>
-            <Segmented
-              value={opts.variation}
-              onChange={(v) => set("variation", v)}
-              options={VARIATIONS.map((v) => ({ value: v.value, label: v.label, icon: v.value === "safe" ? <Check /> : v.value === "creative" ? <Sparkles /> : <Zap /> }))}
-            />
-            <div className="mt-1.5 text-[11px] text-muted-foreground">{PROMPT_STYLES.find((p) => p.value === (opts.promptStyle ?? "concise"))?.desc} {VARIATIONS.find((v) => v.value === opts.variation)?.desc}</div>
-
-            {compiled && compiled.warnings.length > 0 && (
-              <div className="mt-3 space-y-1 rounded-lg border border-warning/30 bg-warning/[0.06] p-2.5">
-                {compiled.warnings.map((w) => (
-                  <div key={w} className="flex gap-2 text-[11px] text-warning"><AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />{w}</div>
-                ))}
-              </div>
-            )}
-
-            <div className="relative mt-3 min-h-[240px] flex-1 overflow-hidden rounded-xl border bg-background/70">
-              {!compiled ? (
-                <div className="flex h-full items-center justify-center p-6 text-center text-sm text-muted-foreground">Select a creator to start compiling.</div>
-              ) : editing ? (
-                <textarea
-                  className="h-full w-full resize-none bg-transparent p-4 font-mono text-[12px] leading-relaxed outline-none"
-                  dir="auto"
-                  value={finalPrompt}
-                  onChange={(e) => {
-                    if (manualPrompt === null) setEditBase(compiledKey);
-                    setManualPrompt(e.target.value);
-                  }}
-                  autoFocus
-                />
-              ) : (
-                <pre className="h-full overflow-auto whitespace-pre-wrap p-4 font-mono text-[12px] leading-relaxed text-foreground/90" dir="auto">{finalPrompt}</pre>
-              )}
-              {compiled && (
-                <div className="absolute right-2 top-2 flex gap-1">
-                  <Button size="icon-sm" variant="secondary" title={editing ? "Done editing" : "Edit prompt manually"} onClick={() => setEditing(!editing)}>{editing ? <Check /> : <Pencil />}</Button>
-                  {manualPrompt !== null && (
-                    <Button size="icon-sm" variant="secondary" title="Discard manual edits and recompile" onClick={() => { setManualPrompt(null); setEditing(false); }}><RotateCcw /></Button>
-                  )}
+        {/* ------------------------------------------------------------ Output */}
+        {creator && compiled && (
+          <aside className="border-t bg-panel/40 lg:sticky lg:top-[53px] lg:h-[calc(100vh-53px)] lg:overflow-y-auto lg:border-s lg:border-t-0">
+            <div className="space-y-6 p-4 md:p-6">
+              <Step n={1} title="انسخ البرومبت وافتح ChatGPT" done={sent}>
+                <Button size="xl" className="h-14 w-full text-base font-bold" onClick={copyAndOpen}>
+                  <Sparkles className="!size-5" /> انسخ وافتح ChatGPT
+                </Button>
+                <div className="mt-2 flex items-center justify-between gap-2">
+                  <button onClick={copyPrompt} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"><ClipboardCopy className="h-3.5 w-3.5" /> انسخ البرومبت بس</button>
+                  <button onClick={() => setShowPrompt((v) => !v)} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+                    {showPrompt ? "اخفي البرومبت" : "شوف البرومبت"} <ChevronDown className={cn("h-3.5 w-3.5 transition", showPrompt && "rotate-180")} />
+                  </button>
                 </div>
-              )}
-            </div>
-            {manualPrompt !== null && (
-              <div className={cn("mt-2 text-[11px]", stale ? "text-warning" : "text-muted-foreground")}>
-                {stale ? "Manual edits active — inputs changed since. Click ↺ to recompile." : "Manual edits active."}
-              </div>
-            )}
+                {showPrompt && (
+                  <div className="relative mt-3 overflow-hidden rounded-xl border bg-background/70" dir="ltr">
+                    {editing ? (
+                      <textarea className="h-72 w-full resize-none bg-transparent p-3 font-mono text-[12px] leading-relaxed outline-none" value={finalPrompt} onChange={(e) => setManualPrompt(e.target.value)} autoFocus />
+                    ) : (
+                      <pre className="max-h-72 overflow-auto whitespace-pre-wrap p-3 font-mono text-[12px] leading-relaxed text-foreground/90">{finalPrompt}</pre>
+                    )}
+                    <div className="absolute right-2 top-2 flex gap-1">
+                      <Button size="icon-sm" variant="secondary" title={editing ? "خلاص" : "عدّل بإيدك"} onClick={() => setEditing(!editing)}>{editing ? <Check /> : <Pencil />}</Button>
+                      {manualPrompt !== null && <Button size="icon-sm" variant="secondary" title="ارجع للبرومبت الأصلي" onClick={() => { setManualPrompt(null); setEditing(false); }}><RotateCcw /></Button>}
+                    </div>
+                  </div>
+                )}
+                <a href={settings.chatgptUrl} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-primary"><ExternalLink className="h-3 w-3" /> chatgpt.com</a>
+              </Step>
 
-            <div className="mt-4 space-y-2">
-              <Button size="xl" className="w-full text-[15px]" disabled={!compiled} onClick={copyAndOpen}>
-                <ExternalLink className="!size-5" /> Copy Prompt &amp; Open ChatGPT
-              </Button>
-              <div className="grid grid-cols-3 gap-2">
-                <Button variant="secondary" size="sm" disabled={!compiled} onClick={() => copy("prompt")}>{copied === "prompt" ? <Check /> : <ClipboardCopy />} Prompt</Button>
-                <Button variant="secondary" size="sm" disabled={!compiled} onClick={() => copy("manifest")}>{copied === "manifest" ? <Check /> : <FileText />} Manifest</Button>
-                <Button variant="secondary" size="sm" disabled={!compiled} onClick={() => setDialogOpen(true)}><History /> Checklist</Button>
-              </div>
-              <p className="pt-1 text-center text-[11px] leading-relaxed text-muted-foreground">
-                Manual Mode: images are <span className="text-foreground">not</span> uploaded automatically. Attach the {compiled?.attachments.length ?? 0} listed image(s) in ChatGPT yourself.
-              </p>
+              <Step n={2} title={compiled.attachments.length ? `ارفع الـ ${compiled.attachments.length} صور دول في ChatGPT بنفس الترتيب` : "مفيش صور مختارة"}>
+                {compiled.attachments.length > 0 ? (
+                  <>
+                    <div className="flex gap-2 overflow-x-auto pb-1">
+                      {compiled.attachments.map((att) => {
+                        const a = byId.get(att.assetId);
+                        return a ? (
+                          <div key={att.assetId} className="relative w-16 shrink-0">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={a.url} alt="" className="aspect-[4/5] w-full rounded-lg object-cover" />
+                            <span className="absolute start-1 top-1 rounded bg-primary px-1 font-mono text-[10px] font-bold text-primary-foreground">{att.index}</span>
+                          </div>
+                        ) : null;
+                      })}
+                    </div>
+                    <Button variant="secondary" className="mt-3 w-full" onClick={saveImages}><Download /> احفظ الصور على الجهاز</Button>
+                    <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">البرنامج مش بيرفع الصور لوحده — في ChatGPT دوس <b>+</b> واختار الصور دي، والصق البرومبت وابعت.</p>
+                  </>
+                ) : (
+                  <p className="text-xs text-muted-foreground">ضيف صورة وش الكريتور على الأقل عشان النتيجة تبقى شبهه.</p>
+                )}
+              </Step>
+
+              <Step n={3} title="رجّع التصميم هنا" done={imported.length > 0}>
+                <Dropzone onFiles={importFiles} busy={importing} enablePaste title="حط الصورة اللي طلعت من ChatGPT" hint="اسحبها هنا، أو دوس واختارها، أو الصقها (⌘V)" className="py-7" />
+                {imported.length > 0 && (
+                  <div className="mt-3 space-y-2">
+                    <div className="grid grid-cols-2 gap-2">
+                      {imported.map((r) => (
+                        <Link key={r.id} href={`/library?open=${r.id}`} className="overflow-hidden rounded-lg border hover:border-primary/50">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={r.url} alt="" className="aspect-video w-full object-cover" />
+                        </Link>
+                      ))}
+                    </div>
+                    <Button asChild variant="secondary" size="sm" className="w-full"><Link href="/library"><Upload /> افتح النتايج — قيّم وصدّر ١٢٨٠×٧٢٠</Link></Button>
+                  </div>
+                )}
+              </Step>
             </div>
-          </div>
-        </aside>
+          </aside>
+        )}
       </div>
-
-      {compiled && creator && (
-        <ChatGPTDialog
-          open={dialogOpen}
-          onOpenChange={setDialogOpen}
-          chatgptUrl={settings.chatgptUrl}
-          prompt={finalPrompt}
-          manifest={compiled.manifest}
-          attachments={compiled.attachments}
-          assets={creatorAssets}
-          ensureProject={() => (projectId && !dirty ? Promise.resolve(projectId) : saveProject(true))}
-          importContext={{ creatorId: creator.id, presetId, concept: opts.concept, variation: opts.variation }}
-        />
-      )}
     </div>
   );
 }
 
-function Step({ n, title, children, done, right }: { n: number; title: string; children: React.ReactNode; done?: boolean; right?: React.ReactNode }) {
+function Step({ n, title, children, done }: { n: number; title: string; children: React.ReactNode; done?: boolean }) {
   return (
-    <Card className="animate-fade-up p-5">
-      <div className="mb-3.5 flex items-center gap-3">
-        <span className={cn("flex h-6 w-6 items-center justify-center rounded-full font-mono text-[11px] font-semibold transition", done ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")}>
-          {done ? <Check className="h-3.5 w-3.5" /> : n}
-        </span>
-        <h2 className="flex-1 text-sm font-semibold tracking-tight">{title}</h2>
-        {right}
+    <section>
+      <div className="mb-2.5 flex items-center gap-2.5">
+        <span className={cn("flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold", done ? "bg-success text-black" : "bg-primary/15 text-primary")}>{done ? <Check className="h-3.5 w-3.5" /> : n}</span>
+        <h2 className="text-sm font-bold">{title}</h2>
       </div>
       {children}
-    </Card>
+    </section>
   );
 }
 
-function PresetChip({ active, onClick, name, desc, tag }: { active: boolean; onClick: () => void; name: string; desc?: string; tag?: string }) {
+function SceneChip({ active, onClick, label, icon, hint }: { active: boolean; onClick: () => void; label: string; icon?: boolean; hint?: boolean }) {
   return (
-    <button onClick={onClick} className={cn("rounded-xl border p-3 text-left transition", active ? "border-primary/60 bg-primary/[0.06] glow-ring" : "bg-background/40 hover:border-white/15")}>
-      <div className="flex items-center justify-between gap-2">
-        <span className="truncate text-sm font-medium">{name}</span>
-        {tag && <span className="shrink-0 text-[10px] uppercase tracking-wider text-muted-foreground">{tag}</span>}
-      </div>
-      {desc && <div className="mt-1 line-clamp-2 text-[11px] leading-snug text-muted-foreground">{desc}</div>}
+    <button
+      onClick={onClick}
+      className={cn(
+        "flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-medium transition",
+        active ? "border-primary/60 bg-primary/15 text-primary" : hint ? "border-primary/30 text-foreground" : "text-muted-foreground hover:border-white/20 hover:text-foreground",
+      )}
+    >
+      {icon && <Sparkles className="h-3 w-3" />}
+      {label}
     </button>
   );
 }

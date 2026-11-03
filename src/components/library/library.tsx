@@ -85,59 +85,59 @@ export function Library({
   return (
     <div>
       <PageHeader
-        title="Library"
-        subtitle={`${results.length} imported thumbnail${results.length === 1 ? "" : "s"} · review, rate, revise, compare and export at 1280×720.`}
+        title="النتايج"
+        subtitle={`${results.length} ثمبنيل · قيّم، قارن، وصدّر بمقاس يوتيوب ١٢٨٠×٧٢٠`}
         actions={
           <>
             {compare.length > 0 && (
               <Button variant="secondary" onClick={() => setCompareOpen(true)} disabled={compare.length < 2}>
-                <Columns2 /> Compare ({compare.length}/2)
+                <Columns2 /> قارن ({compare.length}/2)
               </Button>
             )}
-            <Button onClick={() => setImportOpen(true)} disabled={!creators.length}><Upload /> Import thumbnail</Button>
+            <Button onClick={() => setImportOpen(true)} disabled={!creators.length}><Upload /> ضيف ثمبنيل</Button>
           </>
         }
       />
-      <div className="sticky top-0 z-10 flex flex-wrap items-center gap-2 border-b bg-background/85 px-8 py-3 backdrop-blur">
-        <div className="relative w-64">
-          <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-          <Input className="h-8 pl-8 text-xs" placeholder="Search concept, feedback, prompt…" value={q} onChange={(e) => setQ(e.target.value)} />
+      <div className="sticky top-0 z-10 flex flex-wrap items-center gap-2 border-b bg-background/85 px-4 py-3 backdrop-blur md:px-8">
+        <div className="relative w-full sm:w-64">
+          <Search className="absolute start-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input className="h-8 ps-8 text-xs" placeholder="دوّر…" value={q} onChange={(e) => setQ(e.target.value)} />
         </div>
-        <NativeSelect className="h-8 w-44 text-xs" value={creator} onChange={(e) => setCreator(e.target.value)}>
-          <option value="">All creators</option>
+        <NativeSelect className="h-8 w-[calc(50%-4px)] text-xs sm:w-44" value={creator} onChange={(e) => setCreator(e.target.value)}>
+          <option value="">كل الكريتورز</option>
           {creators.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
         </NativeSelect>
-        <NativeSelect className="h-8 w-44 text-xs" value={preset} onChange={(e) => setPreset(e.target.value)}>
-          <option value="">All presets</option>
+        <NativeSelect className="h-8 w-[calc(50%-4px)] text-xs sm:w-44" value={preset} onChange={(e) => setPreset(e.target.value)}>
+          <option value="">كل القوالب</option>
           {presets.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
         </NativeSelect>
-        <NativeSelect className="h-8 w-40 text-xs" value={status} onChange={(e) => setStatus(e.target.value)}>
-          <option value="">Any status</option>
+        <NativeSelect className="h-8 w-[calc(50%-4px)] text-xs sm:w-40" value={status} onChange={(e) => setStatus(e.target.value)}>
+          <option value="">كل الحالات</option>
           {RESULT_STATUSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
         </NativeSelect>
-        <NativeSelect className="h-8 w-32 text-xs" value={minRating} onChange={(e) => setMinRating(Number(e.target.value))}>
-          <option value={0}>Any rating</option>
+        <NativeSelect className="h-8 w-[calc(50%-4px)] text-xs sm:w-32" value={minRating} onChange={(e) => setMinRating(Number(e.target.value))}>
+          <option value={0}>كل التقييمات</option>
           {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{"★".repeat(n)}+</option>)}
         </NativeSelect>
-        <NativeSelect className="h-8 w-32 text-xs" value={sort} onChange={(e) => setSort(e.target.value as typeof sort)}>
-          <option value="new">Newest</option>
-          <option value="old">Oldest</option>
-          <option value="rating">Top rated</option>
+        <NativeSelect className="h-8 w-[calc(50%-4px)] text-xs sm:w-32" value={sort} onChange={(e) => setSort(e.target.value as typeof sort)}>
+          <option value="new">الأحدث</option>
+          <option value="old">الأقدم</option>
+          <option value="rating">الأعلى تقييم</option>
         </NativeSelect>
         <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <input type="checkbox" checked={latestOnly} onChange={(e) => setLatestOnly(e.target.checked)} className="accent-[hsl(var(--primary))]" /> Latest revision only
+          <input type="checkbox" checked={latestOnly} onChange={(e) => setLatestOnly(e.target.checked)} className="accent-[hsl(var(--primary))]" /> آخر نسخة بس
         </label>
-        {anyFilter && <Button size="sm" variant="ghost" onClick={() => { setCreator(""); setPreset(""); setStatus(""); setMinRating(0); setQ(""); }}><X /> Clear</Button>}
-        <span className="ml-auto text-xs text-muted-foreground">{filtered.length} shown</span>
+        {anyFilter && <Button size="sm" variant="ghost" onClick={() => { setCreator(""); setPreset(""); setStatus(""); setMinRating(0); setQ(""); }}><X /> امسح الفلتر</Button>}
+        <span className="ms-auto text-xs text-muted-foreground">{filtered.length} ظاهر</span>
       </div>
 
-      <div className="px-8 py-6">
+      <div className="px-4 py-5 md:px-8 md:py-6">
         {results.length === 0 ? (
-          <EmptyState icon={<Images />} title="No thumbnails yet" action={<Button onClick={() => setImportOpen(true)} disabled={!creators.length}><Upload /> Import a thumbnail</Button>}>
-            Generate in ChatGPT using a Studio prompt, then import the image here or directly from the Studio checklist.
+          <EmptyState icon={<Images />} title="لسه مفيش ثمبنيلات" action={<Button onClick={() => setImportOpen(true)} disabled={!creators.length}><Upload /> ضيف ثمبنيل</Button>}>
+            اعمل التصميم في ChatGPT من الاستوديو، وبعدين رجّع الصورة هنا أو من الخطوة ٣ في الاستوديو.
           </EmptyState>
         ) : filtered.length === 0 ? (
-          <div className="py-16 text-center text-sm text-muted-foreground">No thumbnails match these filters.</div>
+          <div className="py-16 text-center text-sm text-muted-foreground">مفيش نتايج بالفلتر ده.</div>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
             {filtered.map((r, i) => {
@@ -149,21 +149,21 @@ export function Library({
                   <button className="relative block aspect-video w-full overflow-hidden bg-black" onClick={() => setOpenId(r.id)}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={r.url} alt={r.concept} className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]" loading="lazy" />
-                    <div className="absolute left-2 top-2 flex gap-1">
+                    <div className="absolute start-2 top-2 flex gap-1">
                       <Badge tone={statusTone(r.status)} className="bg-black/70 backdrop-blur">{labelOf(RESULT_STATUSES, r.status)}</Badge>
-                      {group.length > 1 && <Badge className="bg-black/70 backdrop-blur">v{r.version} of {group.length}</Badge>}
+                      {group.length > 1 && <Badge className="bg-black/70 backdrop-blur">نسخة {r.version} من {group.length}</Badge>}
                     </div>
                   </button>
                   <div className="space-y-2 p-3">
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <div className="truncate text-sm font-medium" dir="auto">{r.concept || "Untitled"}</div>
+                        <div className="truncate text-sm font-medium" dir="auto">{r.concept || "بدون اسم"}</div>
                         <div className="truncate text-[11px] text-muted-foreground">
-                          {c?.name ?? "Unknown"} · {r.presetId ? presetById.get(r.presetId)?.name ?? "Preset" : "No preset"}{r.variation ? ` · ${r.variation}` : ""}
+                          {c?.name ?? "—"}{r.presetId ? ` · ${presetById.get(r.presetId)?.name ?? ""}` : ""}
                         </div>
                       </div>
-                      <label className="flex shrink-0 cursor-pointer items-center gap-1 text-[11px] text-muted-foreground" title="Select for comparison">
-                        <input type="checkbox" checked={inCompare} onChange={() => toggleCompare(r.id)} className="accent-[hsl(var(--primary))]" /> Compare
+                      <label className="flex shrink-0 cursor-pointer items-center gap-1 text-[11px] text-muted-foreground" title="اختار للمقارنة">
+                        <input type="checkbox" checked={inCompare} onChange={() => toggleCompare(r.id)} className="accent-[hsl(var(--primary))]" /> قارن
                       </label>
                     </div>
                     <div className="flex items-center justify-between">

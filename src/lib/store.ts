@@ -81,14 +81,14 @@ export async function imageSize(blob: Blob): Promise<{ width: number; height: nu
       return out;
     }
   } catch {
-    throw new StoreError("The file could not be read as an image.");
+    throw new StoreError("الملف ده مش صورة أو مش مقروء.");
   }
   return { width: 0, height: 0 };
 }
 
 async function storeImage(file: Blob, name: string) {
-  if (!ACCEPTED_MIME.includes(file.type)) throw new StoreError(`Unsupported file type "${file.type || "unknown"}". Use PNG, JPG, WEBP, GIF or AVIF.`);
-  if (file.size > MAX_UPLOAD_BYTES) throw new StoreError("File is larger than 30 MB.");
+  if (!ACCEPTED_MIME.includes(file.type)) throw new StoreError(`نوع الملف مش مدعوم. استخدم PNG أو JPG أو WEBP.`);
+  if (file.size > MAX_UPLOAD_BYTES) throw new StoreError("الملف أكبر من ٣٠ ميجا.");
   const { width, height } = await imageSize(file);
   const fileId = newId();
   await db.files.add({ id: fileId, blob: file });
@@ -156,7 +156,7 @@ export async function getCreatorFull(id: string) {
 
 export async function createCreator(input: CreatorInput & { styleDna?: StyleDna }) {
   const name = String(input.name ?? "").trim();
-  if (!name) throw new StoreError("Creator name is required");
+  if (!name) throw new StoreError("اكتب اسم الكريتور");
   const rec: CreatorRecord = {
     ...CREATOR_DEFAULTS,
     ...input,
@@ -175,7 +175,7 @@ export async function updateCreator(id: string, input: CreatorInput & { styleDna
   const data: Partial<CreatorRecord> = { ...input, updatedAt: now() };
   if (input.styleDna) data.styleDna = parseDna(JSON.stringify(input.styleDna));
   const n = await db.creators.update(id, data);
-  if (!n && !(await db.creators.get(id))) throw new StoreError("Creator not found");
+  if (!n && !(await db.creators.get(id))) throw new StoreError("الكريتور مش موجود");
 }
 
 export async function deleteCreator(id: string) {
@@ -203,9 +203,9 @@ export async function listAssets(): Promise<AssetDTO[]> {
 }
 
 export async function uploadAssets(creatorId: string, kind: string, files: File[]) {
-  if (!ASSET_KINDS.some((k) => k.value === kind)) throw new StoreError("Unknown asset kind");
+  if (!ASSET_KINDS.some((k) => k.value === kind)) throw new StoreError("نوع صورة مش معروف");
   const creator = await db.creators.get(creatorId);
-  if (!creator) throw new StoreError("Creator not found");
+  if (!creator) throw new StoreError("الكريتور مش موجود");
   const created: AssetRecord[] = [];
   for (const file of files) {
     const stored = await storeImage(file, file.name);
@@ -271,7 +271,7 @@ export type PresetInput = Partial<Omit<PresetRecord, "id" | "slug" | "builtIn" |
 
 export async function createPreset(input: PresetInput) {
   const name = String(input.name ?? "").trim();
-  if (!name) throw new StoreError("Preset name is required");
+  if (!name) throw new StoreError("اكتب اسم القالب");
   let slug = slugify(name);
   if (await db.presets.where("slug").equals(slug).first()) slug = `${slug}-${Date.now().toString(36)}`;
   const rec: PresetRecord = {
@@ -308,7 +308,7 @@ export async function updatePreset(id: string, input: PresetInput) {
 export async function deletePreset(id: string) {
   const p = await db.presets.get(id);
   if (!p) return;
-  if (p.builtIn) throw new StoreError("Built-in presets cannot be deleted (you can edit or restore them).");
+  if (p.builtIn) throw new StoreError("القوالب الجاهزة مينفعش تتمسح (تقدر تعدّلها أو ترجّعها لأصلها).");
   await db.presets.delete(id);
   await db.projects.toCollection().modify((pr) => {
     if (pr.presetId === id) pr.presetId = null;
@@ -325,7 +325,7 @@ export async function listProjects(): Promise<ProjectWithCount[]> {
 }
 
 export async function saveProject(id: string | null, input: ProjectInput): Promise<ProjectRecord> {
-  if (!input.creatorId && !id) throw new StoreError("Select a creator first");
+  if (!input.creatorId && !id) throw new StoreError("اختار الكريتور الأول");
   const title = input.title || (input.concept ?? "").slice(0, 90);
   if (id && (await db.projects.get(id))) {
     await db.projects.update(id, { ...input, title, updatedAt: now() });
@@ -384,7 +384,7 @@ export async function importResult(input: ImportInput): Promise<ResultRecord> {
   let version = 1;
   if (input.parentId) {
     const parent = await db.results.get(input.parentId);
-    if (!parent) throw new StoreError("Parent result not found");
+    if (!parent) throw new StoreError("النسخة الأصلية مش موجودة");
     creatorId ||= parent.creatorId;
     presetId ||= parent.presetId;
     concept ||= parent.concept;
@@ -395,7 +395,7 @@ export async function importResult(input: ImportInput): Promise<ResultRecord> {
     const chain = await db.results.filter((r) => r.id === parentId || r.parentId === parentId).toArray();
     version = Math.max(1, ...chain.map((r) => r.version)) + 1;
   }
-  if (!creatorId) throw new StoreError("Choose a creator");
+  if (!creatorId) throw new StoreError("اختار الكريتور");
   const stored = await storeImage(input.file, input.file.name || "thumbnail");
   const rec: ResultRecord = {
     id: newId(),
@@ -421,7 +421,7 @@ export async function importResult(input: ImportInput): Promise<ResultRecord> {
 
 export async function updateResult(id: string, data: Partial<Pick<ResultRecord, "feedback" | "status" | "rating" | "concept">>) {
   const patch = { ...data, updatedAt: now() };
-  if (patch.status !== undefined && !RESULT_STATUSES.some((s) => s.value === patch.status)) throw new StoreError("Invalid status");
+  if (patch.status !== undefined && !RESULT_STATUSES.some((s) => s.value === patch.status)) throw new StoreError("حالة مش صحيحة");
   if (patch.rating !== undefined) patch.rating = Math.min(5, Math.max(0, Math.round(Number(patch.rating) || 0)));
   await db.results.update(id, patch);
 }
@@ -497,9 +497,9 @@ export async function importBackup(file: File) {
   try {
     data = JSON.parse(await file.text());
   } catch {
-    throw new StoreError("This is not a valid ThumbStudio backup file.");
+    throw new StoreError("الملف ده مش نسخة احتياطية صحيحة.");
   }
-  if (data?.app !== "ThumbStudio AI" || !Array.isArray(data.creators)) throw new StoreError("This is not a ThumbStudio backup file.");
+  if (data?.app !== "ThumbStudio AI" || !Array.isArray(data.creators)) throw new StoreError("الملف ده مش نسخة احتياطية من ThumbStudio.");
   const files = await Promise.all((data.files ?? []).map(async (f) => ({ id: f.id, blob: await dataUrlToBlob(f.data) })));
   await db.transaction("rw", [db.creators, db.assets, db.presets, db.projects, db.results, db.settings, db.files], async () => {
     await Promise.all([db.creators.clear(), db.assets.clear(), db.presets.clear(), db.projects.clear(), db.results.clear(), db.settings.clear(), db.files.clear()]);

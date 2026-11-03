@@ -19,15 +19,15 @@ function EditCreator() {
   if (!creator) {
     return (
       <div className="p-8">
-        <EmptyState icon={<Users />} title="Creator not found" action={<Button asChild variant="secondary"><Link href="/creators">Back to creators</Link></Button>}>
-          It may have been deleted, or it lives in another browser.
+        <EmptyState icon={<Users />} title="الكريتور مش موجود" action={<Button asChild variant="secondary"><Link href="/creators">ارجع للكريتورز</Link></Button>}>
+          ممكن يكون اتمسح، أو متسجل في متصفح تاني.
         </EmptyState>
       </div>
     );
   }
   const assets = data.assets.filter((a) => a.creatorId === id);
   return (
-    <div className="px-8 py-7">
+    <div className="px-4 py-5 md:px-8 md:py-7">
       <CreatorEditor key={id} creator={creator} assets={assets} presets={data.presets.filter((p) => p.creatorId === id)} initialTab={tab} />
     </div>
   );

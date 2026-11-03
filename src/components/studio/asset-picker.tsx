@@ -7,15 +7,15 @@ import { orderAssets } from "@/lib/prompt/compiler";
 import type { AssetDTO } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-/** Sensible default selection: best face, best expression, main logo, top 2 references. */
+/**
+ * Default selection: just the creator's best face photo (or best expression).
+ * Fewer, clearer attachments give ChatGPT the best likeness; cards and
+ * references are added per video.
+ */
 export function autoSelect(assets: AssetDTO[]): string[] {
-  const by = (k: string) => assets.filter((a) => a.kind === k).sort((a, b) => a.priority - b.priority);
-  return [
-    ...by("face").slice(0, 2),
-    ...by("expression").slice(0, 1),
-    ...by("logo").filter((a) => a.priority <= 2).slice(0, 1),
-    ...by("reference").slice(0, 2),
-  ].map((a) => a.id);
+  const by = (k: string) => assets.filter((a) => a.kind === k).sort((a, b) => a.priority - b.priority || a.createdAt.localeCompare(b.createdAt));
+  const face = by("face")[0] ?? by("expression")[0];
+  return face ? [face.id] : [];
 }
 
 export function AssetPicker({ assets, selected, onChange, creatorId }: { assets: AssetDTO[]; selected: string[]; onChange: (ids: string[]) => void; creatorId: string }) {
@@ -27,8 +27,8 @@ export function AssetPicker({ assets, selected, onChange, creatorId }: { assets:
   if (!assets.length) {
     return (
       <div className="flex items-center justify-between gap-4 rounded-xl border border-dashed p-5 text-sm text-muted-foreground">
-        This creator has no photography or references yet.
-        <Button asChild size="sm"><Link href={`/creators/edit?id=${creatorId}&tab=assets`}><ImagePlus /> Upload assets</Link></Button>
+        لسه مفيش صور للكريتور ده.
+        <Button asChild size="sm"><Link href={`/creators/edit?id=${creatorId}&tab=assets`}><ImagePlus /> ارفع صور</Link></Button>
       </div>
     );
   }
@@ -36,9 +36,9 @@ export function AssetPicker({ assets, selected, onChange, creatorId }: { assets:
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap gap-2">
-        <Button size="sm" variant="secondary" onClick={() => onChange(autoSelect(assets))}><Wand /> Auto-select</Button>
-        <Button size="sm" variant="ghost" onClick={() => onChange([])}>Clear</Button>
-        <Button size="sm" variant="ghost" asChild className="ml-auto"><Link href={`/creators/edit?id=${creatorId}&tab=assets`}><ImagePlus /> Manage assets</Link></Button>
+        <Button size="sm" variant="secondary" onClick={() => onChange(autoSelect(assets))}><Wand /> اختيار تلقائي</Button>
+        <Button size="sm" variant="ghost" onClick={() => onChange([])}>امسح الاختيار</Button>
+        <Button size="sm" variant="ghost" asChild className="ms-auto"><Link href={`/creators/edit?id=${creatorId}&tab=assets`}><ImagePlus /> إدارة الصور</Link></Button>
       </div>
       {ASSET_KINDS.map((k) => {
         const list = assets.filter((a) => a.kind === k.value);
@@ -63,15 +63,15 @@ export function AssetPicker({ assets, selected, onChange, creatorId }: { assets:
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={a.url} alt={a.label} className="h-full w-full object-cover" />
-                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 to-transparent px-1.5 pb-1 pt-4 text-left text-[10px] leading-tight text-white/90">
+                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 to-transparent px-1.5 pb-1 pt-4 text-start text-[10px] leading-tight text-white/90">
                       <div className="truncate" dir="auto">{a.label}</div>
                     </div>
                     {n ? (
-                      <span className="absolute left-1.5 top-1.5 flex h-5 min-w-5 items-center justify-center rounded-md bg-primary px-1 font-mono text-[10px] font-bold text-primary-foreground">{n}</span>
+                      <span className="absolute start-1.5 top-1.5 flex h-5 min-w-5 items-center justify-center rounded-md bg-primary px-1 font-mono text-[10px] font-bold text-primary-foreground">{n}</span>
                     ) : (
-                      <span className="absolute left-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-md border border-white/40 bg-black/40 opacity-0 transition group-hover:opacity-100"><Check className="h-3 w-3" /></span>
+                      <span className="absolute start-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-md border border-white/40 bg-black/40 opacity-0 transition group-hover:opacity-100"><Check className="h-3 w-3" /></span>
                     )}
-                    {a.priority === 1 && <span className="absolute right-1.5 top-1.5 rounded bg-black/70 px-1 text-[9px] font-semibold text-primary">P1</span>}
+                    {a.priority === 1 && <span className="absolute end-1.5 top-1.5 rounded bg-black/70 px-1 text-[9px] font-semibold text-primary">P1</span>}
                   </button>
                 );
               })}

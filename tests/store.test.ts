@@ -18,7 +18,7 @@ describe("store", () => {
     expect(c.channelName).toBe("Alex");
     await updateCreator(c.id, { niche: "EA FC" });
     expect((await listCreators())[0].niche).toBe("EA FC");
-    await expect(createCreator({ name: " " })).rejects.toThrow(/required/);
+    await expect(createCreator({ name: " " })).rejects.toThrow(/اكتب اسم/);
   });
 
   it("uploads assets, sets first logo as default, rejects non-images", async () => {
@@ -27,7 +27,7 @@ describe("store", () => {
     const full = await getCreatorFull(c.id);
     expect(full!.assets).toHaveLength(1);
     expect(full!.creator.logoAssetId).toBe(full!.assets[0].id);
-    await expect(uploadAssets(c.id, "face", [new File(["x"], "a.txt", { type: "text/plain" })])).rejects.toThrow(/Unsupported/);
+    await expect(uploadAssets(c.id, "face", [new File(["x"], "a.txt", { type: "text/plain" })])).rejects.toThrow(/مش مدعوم/);
     await deleteAsset(full!.assets[0].id);
     expect((await db.creators.get(c.id))!.logoAssetId).toBeNull();
     expect(await db.files.count()).toBe(0);
@@ -56,7 +56,7 @@ describe("store", () => {
     const [after] = await listResults();
     expect(after.status).toBe("approved");
     expect(after.rating).toBe(5);
-    await expect(updateResult(r.id, { status: "nope" })).rejects.toThrow(/Invalid/);
+    await expect(updateResult(r.id, { status: "nope" })).rejects.toThrow(/مش صحيحة/);
   });
 
   it("cascades creator deletion", async () => {
@@ -76,7 +76,7 @@ describe("store", () => {
     await ensureBuiltInPresets(true);
     const presets = await listPresets();
     expect(presets.filter((p) => p.builtIn)).toHaveLength(6);
-    await expect(deletePreset(presets[0].id)).rejects.toThrow(/Built-in/);
+    await expect(deletePreset(presets[0].id)).rejects.toThrow(/مينفعش/);
   });
 
   it("saves and updates projects", async () => {

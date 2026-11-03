@@ -28,7 +28,7 @@ export function ImportDialog({ open, onOpenChange, creators, projects, presets, 
   }, [projectId, projects]);
 
   async function upload(files: File[]) {
-    if (!creatorId) { toast.error("Choose a creator"); return; }
+    if (!creatorId) { toast.error("اختار الكريتور"); return; }
     setBusy(true);
     try {
       let last: ResultRecord | null = null;
@@ -36,7 +36,7 @@ export function ImportDialog({ open, onOpenChange, creators, projects, presets, 
         const p = projects.find((x) => x.id === projectId);
         last = await importResult({ file: f, creatorId, projectId: projectId || null, presetId: presetId || null, concept, prompt, variation: p?.variation ?? "" });
       }
-      toast.success(`${files.length} thumbnail${files.length > 1 ? "s" : ""} imported`);
+      toast.success(files.length > 1 ? `اتضافت ${files.length} ثمبنيلات` : "الثمبنيل اتضاف");
       onOpenChange(false);
       if (last) onImported(last.id);
     } catch (e) {
@@ -49,33 +49,33 @@ export function ImportDialog({ open, onOpenChange, creators, projects, presets, 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent wide>
-        <DialogHeader title="Import thumbnail" description="Add an image generated in ChatGPT. Link it to a project to keep its prompt and references." />
+        <DialogHeader title="ضيف ثمبنيل" description="ضيف صورة عملتها في ChatGPT. اربطها بمشروع عشان البرومبت يتحفظ معاها." />
         <div className="grid gap-5 md:grid-cols-2">
           <div className="space-y-3">
             <div>
-              <Label>Creator</Label>
+              <Label>الكريتور</Label>
               <NativeSelect value={creatorId} onChange={(e) => { setCreatorId(e.target.value); setProjectId(""); }}>
                 {creators.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </NativeSelect>
             </div>
             <div>
-              <Label>Project (optional)</Label>
+              <Label>المشروع (اختياري)</Label>
               <NativeSelect value={projectId} onChange={(e) => setProjectId(e.target.value)}>
-                <option value="">— None —</option>
-                {creatorProjects.map((p) => <option key={p.id} value={p.id}>{(p.title || "Untitled").slice(0, 60)}</option>)}
+                <option value="">— من غير —</option>
+                {creatorProjects.map((p) => <option key={p.id} value={p.id}>{(p.title || "بدون اسم").slice(0, 60)}</option>)}
               </NativeSelect>
             </div>
             <div>
-              <Label>Preset</Label>
+              <Label>القالب</Label>
               <NativeSelect value={presetId} onChange={(e) => setPresetId(e.target.value)}>
-                <option value="">— None —</option>
+                <option value="">— من غير —</option>
                 {presets.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
               </NativeSelect>
             </div>
-            <div><Label>Video concept</Label><Input value={concept} onChange={(e) => setConcept(e.target.value)} /></div>
-            <div><Label>Prompt used</Label><Textarea rows={3} className="font-mono text-[11px]" value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="Optional — filled automatically from the project" /></div>
+            <div><Label>فكرة الفيديو</Label><Input value={concept} onChange={(e) => setConcept(e.target.value)} /></div>
+            <div><Label>البرومبت</Label><Textarea rows={3} className="font-mono text-[11px]" value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="اختياري — بيتملي لوحده من المشروع" /></div>
           </div>
-          <Dropzone onFiles={upload} busy={busy} enablePaste={open} title="Drop generated thumbnail(s)" hint="Click, drag & drop, or paste (⌘V)" className="h-full min-h-[240px]" />
+          <Dropzone onFiles={upload} busy={busy} enablePaste={open} title="حط الصورة هنا" hint="دوس للاختيار، أو اسحبها، أو الصقها (⌘V)" className="h-full min-h-[240px]" />
         </div>
       </DialogContent>
     </Dialog>

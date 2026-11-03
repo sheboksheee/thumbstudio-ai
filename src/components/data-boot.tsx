@@ -34,18 +34,18 @@ export function DataBoot({ children }: { children: React.ReactNode }) {
     return (
       <div className="flex min-h-screen items-center justify-center p-8 text-center">
         <div className="max-w-md">
-          <div className="text-lg font-semibold">The local database could not be opened</div>
+          <div className="text-lg font-semibold">مقدرتش أفتح قاعدة البيانات</div>
           <p className="mt-2 text-sm text-muted-foreground">{error}</p>
-          <p className="mt-2 text-sm text-muted-foreground">Private / incognito windows may block storage. Open ThumbStudio in a normal window.</p>
+          <p className="mt-2 text-sm text-muted-foreground">الوضع الخفي (Private) ممكن يمنع الحفظ — افتح الموقع في نافذة عادية.</p>
         </div>
       </div>
     );
   }
-  if (!ready) return <Loading label="Preparing your studio…" />;
+  if (!ready) return <Loading label="بنجهّز الاستوديو…" />;
   return <>{children}</>;
 }
 
-export function Loading({ label = "Loading…" }: { label?: string }) {
+export function Loading({ label = "بيحمّل…" }: { label?: string }) {
   return (
     <div className="flex min-h-[60vh] items-center justify-center gap-2 text-sm text-muted-foreground">
       <Loader2 className="h-4 w-4 animate-spin text-primary" /> {label}

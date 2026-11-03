@@ -8,7 +8,7 @@ export default function SettingsPage() {
   const data = useAppData();
   return (
     <div>
-      <PageHeader title="Settings" subtitle="Presets, workflow defaults and your local data." />
+      <PageHeader title="الإعدادات" subtitle="الإعدادات العامة، النسخ الاحتياطي، والقوالب." />
       {!data ? <Loading /> : <SettingsView settings={data.settings} presets={data.presets} creators={data.creators.map((c) => ({ id: c.id, name: c.name }))} />}
     </div>
   );

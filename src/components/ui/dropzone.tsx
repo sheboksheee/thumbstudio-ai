@@ -12,8 +12,8 @@ export function Dropzone({
   onFiles,
   multiple = true,
   busy,
-  title = "Drop images here",
-  hint = "PNG, JPG, WEBP · click to browse or paste with ⌘V",
+  title = "حط الصور هنا",
+  hint = "PNG أو JPG أو WEBP · دوس للاختيار أو الصق بـ ⌘V",
   className,
   compact,
   enablePaste = false,
@@ -82,7 +82,7 @@ export function Dropzone({
       <div className={cn("flex items-center justify-center rounded-lg bg-primary/10 text-primary transition group-hover:scale-105", compact ? "h-8 w-8" : "h-11 w-11")}>
         {busy ? <Loader2 className="h-5 w-5 animate-spin" /> : <ImagePlus className="h-5 w-5" />}
       </div>
-      <div className={cn("font-medium", compact ? "text-xs" : "text-sm")}>{busy ? "Uploading…" : title}</div>
+      <div className={cn("font-medium", compact ? "text-xs" : "text-sm")}>{busy ? "بيرفع…" : title}</div>
       {!compact && <div className="text-xs text-muted-foreground">{hint}</div>}
     </div>
   );

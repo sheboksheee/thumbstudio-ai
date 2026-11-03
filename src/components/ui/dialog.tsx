@@ -21,9 +21,9 @@ export function DialogContent({ className, children, wide, ...props }: React.Com
         {...props}
       >
         {children}
-        <DialogPrimitive.Close className="absolute right-4 top-4 rounded-md p-1 text-muted-foreground transition hover:bg-accent hover:text-foreground">
+        <DialogPrimitive.Close className="absolute end-4 top-4 rounded-md p-1 text-muted-foreground transition hover:bg-accent hover:text-foreground">
           <X className="h-4 w-4" />
-          <span className="sr-only">Close</span>
+          <span className="sr-only">إغلاق</span>
         </DialogPrimitive.Close>
       </DialogPrimitive.Content>
     </DialogPrimitive.Portal>
@@ -32,7 +32,7 @@ export function DialogContent({ className, children, wide, ...props }: React.Com
 
 export function DialogHeader({ title, description }: { title: React.ReactNode; description?: React.ReactNode }) {
   return (
-    <div className="mb-5 pr-8">
+    <div className="mb-5 pe-8">
       <DialogPrimitive.Title className="text-lg font-semibold tracking-tight">{title}</DialogPrimitive.Title>
       {description ? (
         <DialogPrimitive.Description className="mt-1 text-sm text-muted-foreground">{description}</DialogPrimitive.Description>

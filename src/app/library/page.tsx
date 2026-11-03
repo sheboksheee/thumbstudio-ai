@@ -4,6 +4,7 @@ import { useSearchParams } from "next/navigation";
 import { useAppData } from "@/lib/hooks";
 import { Loading } from "@/components/data-boot";
 import { Library } from "@/components/library/library";
+import { presetLabel } from "@/lib/options";
 
 function LibraryPage() {
   const sp = useSearchParams();
@@ -13,7 +14,7 @@ function LibraryPage() {
     <Library
       results={data.results}
       creators={data.creators.map((c) => ({ id: c.id, name: c.name, channelName: c.channelName, avatarUrl: c.avatarUrl, primaryColor: c.primaryColor }))}
-      presets={data.presets.map((p) => ({ id: p.id, name: p.name }))}
+      presets={data.presets.map((p) => ({ id: p.id, name: presetLabel(p) }))}
       projects={data.projects.map((p) => ({ id: p.id, creatorId: p.creatorId, title: p.title || p.concept, concept: p.concept, presetId: p.presetId, compiledPrompt: p.compiledPrompt, variation: p.variation }))}
       settings={data.settings}
       initialOpen={sp.get("open") ?? undefined}

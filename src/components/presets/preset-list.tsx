@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input, Label, NativeSelect, Textarea } from "@/components/ui/input";
 import { Badge, Card, EmptyState } from "@/components/ui/misc";
 import { Dialog, DialogContent, DialogHeader } from "@/components/ui/dialog";
-import { COLOR_MOODS, SUBJECT_POSITIONS, SUBJECT_SCALES, TEXT_MODES } from "@/lib/options";
+import { COLOR_MOODS, SUBJECT_POSITIONS, SUBJECT_SCALES, TEXT_MODES, presetLabel } from "@/lib/options";
 import type { PresetDefaults } from "@/lib/presets";
 import { TEMPLATE_TOKENS } from "@/lib/presets";
 import type { PresetDTO } from "@/lib/types";
@@ -68,10 +68,10 @@ export function PresetList({ presets, creators, fixedCreatorId }: { presets: Pre
   const creatorName = (id: string | null) => creators.find((c) => c.id === id)?.name;
 
   async function del(p: PresetDTO) {
-    if (!confirm(`Delete preset "${p.name}"?`)) return;
+    if (!confirm(`تمسح القالب «${presetLabel(p)}»؟`)) return;
     try {
       await deletePreset(p.id);
-      toast.success("Preset deleted");
+      toast.success("القالب اتمسح");
     } catch (e) {
       toast.error((e as Error).message);
     }
@@ -80,28 +80,28 @@ export function PresetList({ presets, creators, fixedCreatorId }: { presets: Pre
   return (
     <div>
       <div className="mb-4 flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">Each preset defines a creative objective, composition rules and a prompt template.</p>
-        <Button onClick={() => setDraft(blank(fixedCreatorId))}><Plus /> New preset</Button>
+        <p className="text-sm text-muted-foreground">القالب بيحدد هدف التصميم وتكوينه — مفيد لأنواع الفيديوهات اللي بتتكرر.</p>
+        <Button onClick={() => setDraft(blank(fixedCreatorId))}><Plus /> قالب جديد</Button>
       </div>
       {presets.length === 0 ? (
-        <EmptyState icon={<Layers />} title="No custom presets yet">Create presets for recurring video formats of this creator.</EmptyState>
+        <EmptyState icon={<Layers />} title="مفيش قوالب لسه">اعمل قالب لنوع فيديو بيتكرر عند الكريتور ده.</EmptyState>
       ) : (
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {presets.map((p) => (
             <Card key={p.id} className="flex flex-col p-4">
               <div className="mb-1 flex items-start justify-between gap-2">
-                <div className="font-medium">{p.name}</div>
+                <div className="font-medium">{presetLabel(p)}</div>
                 <div className="flex shrink-0 gap-1">
-                  {p.builtIn && <Badge tone="primary">Built-in</Badge>}
+                  {p.builtIn && <Badge tone="primary">جاهز</Badge>}
                   <Badge tone="outline">{p.niche}</Badge>
                 </div>
               </div>
-              {p.creatorId && <div className="mb-1 text-[11px] text-muted-foreground">For {creatorName(p.creatorId) ?? "creator"}</div>}
+              {p.creatorId && <div className="mb-1 text-[11px] text-muted-foreground">خاص بـ {creatorName(p.creatorId) ?? "كريتور"}</div>}
               <p className="line-clamp-3 flex-1 text-xs leading-relaxed text-muted-foreground">{p.description || p.objective}</p>
               <div className="mt-3 flex gap-1">
-                <Button size="sm" variant="secondary" onClick={() => setDraft(fromPreset(p))}><Pencil /> Edit</Button>
-                <Button size="sm" variant="ghost" onClick={() => setDraft(fromPreset(p, true))}><Copy /> Duplicate</Button>
-                {!p.builtIn && <Button size="sm" variant="ghost" className="ml-auto text-muted-foreground hover:text-destructive" onClick={() => del(p)}><Trash2 /></Button>}
+                <Button size="sm" variant="secondary" onClick={() => setDraft(fromPreset(p))}><Pencil /> عدّل</Button>
+                <Button size="sm" variant="ghost" onClick={() => setDraft(fromPreset(p, true))}><Copy /> نسخة</Button>
+                {!p.builtIn && <Button size="sm" variant="ghost" className="ms-auto text-muted-foreground hover:text-destructive" onClick={() => del(p)}><Trash2 /></Button>}
               </div>
             </Card>
           ))}
@@ -126,14 +126,14 @@ export function PresetDialog({ draft, onClose, creators, fixedCreatorId, onSaved
 
   async function save() {
     if (!d) return;
-    if (!d.name.trim()) return toast.error("Preset name is required");
+    if (!d.name.trim()) return toast.error("اكتب اسم القالب");
     setSaving(true);
     try {
       const { id, builtIn: _b, ...rest } = d;
       void _b;
       const body = { ...rest, creatorId: d.creatorId || null };
       const p = id ? await updatePreset(id, body) : await createPreset(body);
-      toast.success("Preset saved");
+      toast.success("القالب اتحفظ");
       onSaved?.(p);
       onClose();
     } catch (e) {
@@ -153,56 +153,56 @@ export function PresetDialog({ draft, onClose, creators, fixedCreatorId, onSaved
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent wide>
-        <DialogHeader title={d.id ? `Edit preset${d.builtIn ? " (built-in)" : ""}` : "New preset"} description={d.builtIn ? "Edits to built-in presets are kept. You can restore originals in Settings." : "Presets combine with the creator's Style DNA at compile time."} />
+        <DialogHeader title={d.id ? `تعديل القالب${d.builtIn ? " (جاهز)" : ""}` : "قالب جديد"} description={d.builtIn ? "تعديلاتك هتتحفظ، وتقدر ترجّع الأصلي من الإعدادات." : "القالب بيتدمج مع ستايل الكريتور وقت تجهيز البرومبت. اكتب بالعربي أو الإنجليزي."} />
         <div className="grid gap-4 md:grid-cols-3">
-          <div><Label>Name *</Label><Input value={d.name} onChange={(e) => set("name", e.target.value)} placeholder="e.g. Unboxing" /></div>
-          <div><Label>Niche</Label><Input value={d.niche} onChange={(e) => set("niche", e.target.value)} placeholder="EA FC, Tech…" /></div>
+          <div><Label>الاسم *</Label><Input value={d.name} onChange={(e) => set("name", e.target.value)} placeholder="مثال: تحدي أسبوعي" /></div>
+          <div><Label>المجال</Label><Input value={d.niche} onChange={(e) => set("niche", e.target.value)} placeholder="EA FC" /></div>
           <div>
-            <Label>Available for</Label>
+            <Label>متاح لـ</Label>
             <NativeSelect value={d.creatorId} disabled={!!fixedCreatorId || d.builtIn} onChange={(e) => set("creatorId", e.target.value)}>
-              <option value="">All creators</option>
+              <option value="">كل الكريتورز</option>
               {creators.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </NativeSelect>
           </div>
         </div>
         <div className="mt-4 grid gap-4 md:grid-cols-2">
-          {area("description", "Short description", "Shown in the Studio preset picker")}
-          {area("objective", "Creative objective", "What must the viewer feel / understand?")}
-          {area("composition", "Composition rules", "Layout, focal points, placement")}
-          {area("subjectRules", "Subject / expression", "Expression, pose, gesture")}
-          {area("background", "Background", "Environment, complexity")}
-          {area("effects", "Depth & effects", "Glow, particles, light")}
-          {area("textRules", "Text rules", "Applied only when rendering a headline")}
+          {area("description", "وصف قصير", "بيظهر في الاستوديو")}
+          {area("objective", "الهدف", "المشاهد لازم يحس / يفهم إيه؟")}
+          {area("composition", "التكوين", "توزيع العناصر")}
+          {area("subjectRules", "التعبير والوقفة", "صدمة، فرحة، بيشاور…")}
+          {area("background", "الخلفية", "المكان والجو")}
+          {area("effects", "المؤثرات", "جلو، إضاءة، بارتيكلز")}
+          {area("textRules", "قواعد الكتابة", "بتتطبق لو فيه عنوان بس")}
           <div>
-            <Label>Prompt template</Label>
+            <Label>جملة البرومبت</Label>
             <Textarea rows={2} className="font-mono text-xs" value={d.template} onChange={(e) => set("template", e.target.value)} />
-            <div className="mt-1 text-[11px] text-muted-foreground">Tokens: {TEMPLATE_TOKENS.map((t) => `{{${t}}}`).join(" ")}</div>
+            <div className="mt-1 text-[11px] text-muted-foreground">متغيرات: {TEMPLATE_TOKENS.map((t) => `{{${t}}}`).join(" ")}</div>
           </div>
         </div>
         <div className="mt-5">
-          <div className="label-xs mb-2">Studio defaults when this preset is selected</div>
+          <div className="label-xs mb-2">إعدادات بتتظبط لوحدها لما تختار القالب</div>
           <div className="grid gap-3 sm:grid-cols-4">
             <NativeSelect value={d.defaults.subjectPosition ?? ""} onChange={(e) => setDef("subjectPosition", e.target.value)}>
-              <option value="">Position: keep</option>
-              {SUBJECT_POSITIONS.map((o) => <option key={o.value} value={o.value}>Position: {o.label}</option>)}
+              <option value="">المكان: زي ما هو</option>
+              {SUBJECT_POSITIONS.map((o) => <option key={o.value} value={o.value}>المكان: {o.label}</option>)}
             </NativeSelect>
             <NativeSelect value={d.defaults.subjectScale ?? ""} onChange={(e) => setDef("subjectScale", e.target.value)}>
-              <option value="">Scale: keep</option>
-              {SUBJECT_SCALES.map((o) => <option key={o.value} value={o.value}>Scale: {o.label}</option>)}
+              <option value="">الحجم: زي ما هو</option>
+              {SUBJECT_SCALES.map((o) => <option key={o.value} value={o.value}>الحجم: {o.label}</option>)}
             </NativeSelect>
             <NativeSelect value={d.defaults.textMode ?? ""} onChange={(e) => setDef("textMode", e.target.value)}>
-              <option value="">Text: keep</option>
-              {TEXT_MODES.map((o) => <option key={o.value} value={o.value}>Text: {o.label}</option>)}
+              <option value="">الكتابة: زي ما هي</option>
+              {TEXT_MODES.map((o) => <option key={o.value} value={o.value}>الكتابة: {o.label}</option>)}
             </NativeSelect>
             <NativeSelect value={d.defaults.colorMood ?? ""} onChange={(e) => setDef("colorMood", e.target.value)}>
-              <option value="">Mood: keep</option>
-              {COLOR_MOODS.filter((m) => m.value !== "custom").map((o) => <option key={o.value} value={o.value}>Mood: {o.label}</option>)}
+              <option value="">الألوان: زي ما هي</option>
+              {COLOR_MOODS.filter((m) => m.value !== "custom").map((o) => <option key={o.value} value={o.value}>الألوان: {o.label}</option>)}
             </NativeSelect>
           </div>
         </div>
         <div className="mt-6 flex justify-end gap-2">
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button onClick={save} disabled={saving}>{saving && <Loader2 className="animate-spin" />} Save preset</Button>
+          <Button variant="ghost" onClick={onClose}>إلغاء</Button>
+          <Button onClick={save} disabled={saving}>{saving && <Loader2 className="animate-spin" />} احفظ القالب</Button>
         </div>
       </DialogContent>
     </Dialog>

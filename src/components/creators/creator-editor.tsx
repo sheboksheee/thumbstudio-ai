@@ -24,8 +24,8 @@ type Profile = Pick<
 const EMPTY: Profile = {
   name: "",
   channelName: "",
-  niche: "",
-  language: "en",
+  niche: "EA FC",
+  language: "ar",
   primaryColor: "#22d3ee",
   secondaryColor: "#0b1120",
   accentColor: "#f8fafc",
@@ -52,7 +52,7 @@ export function CreatorEditor({ creator, assets, presets, initialTab }: { creato
   const [profile, setProfile] = useState<Profile>(() => toProfile(creator));
   const [dna, setDna] = useState<StyleDna>(() => creator?.styleDna ?? emptyDna());
   const [saving, setSaving] = useState(false);
-  const [tab, setTab] = useState(initialTab ?? "profile");
+  const [tab, setTab] = useState(initialTab ?? (creator ? "assets" : "profile"));
 
   const initial = useMemo(() => JSON.stringify([toProfile(creator), creator?.styleDna ?? emptyDna()]), [creator]);
   const dirty = JSON.stringify([profile, dna]) !== initial;
@@ -62,24 +62,24 @@ export function CreatorEditor({ creator, assets, presets, initialTab }: { creato
   async function save(silent = false) {
     if (!profile.name.trim()) {
       if (!silent) {
-        toast.error("Creator name is required");
+        toast.error("اكتب اسم الكريتور");
         setTab("profile");
       }
       return;
     }
     if (!isNew && !dirty) {
-      if (!silent) toast.success("All changes are saved");
+      if (!silent) toast.success("كل التعديلات محفوظة");
       return;
     }
     setSaving(true);
     try {
       if (isNew) {
         const c = await createCreator({ ...profile, styleDna: dna });
-        toast.success("Creator created — now add photography and references");
+        toast.success("الكريتور اتعمل — ارفع صورة واضحة لوشه");
         router.push(`/creators/edit?id=${c.id}&tab=assets`);
       } else {
         await updateCreator(creator.id, { ...profile, styleDna: dna });
-        if (!silent) toast.success("Creator saved");
+        if (!silent) toast.success("اتحفظ");
       }
     } catch (e) {
       toast.error((e as Error).message);
@@ -130,11 +130,11 @@ export function CreatorEditor({ creator, assets, presets, initialTab }: { creato
 
   async function remove() {
     if (!creator) return;
-    if (!confirm(`Delete ${creator.name}? This permanently removes their assets, projects and imported thumbnails.`)) return;
+    if (!confirm(`تمسح ${creator.name}؟ هيتمسح معاه كل صوره ومشاريعه وثمبنيلاته.`)) return;
     try {
       router.push("/creators");
       await deleteCreator(creator.id);
-      toast.success("Creator deleted");
+      toast.success("الكريتور اتمسح");
     } catch (e) {
       toast.error((e as Error).message);
     }
@@ -150,16 +150,16 @@ export function CreatorEditor({ creator, assets, presets, initialTab }: { creato
           <CreatorAvatar name={profile.name || "?"} url={creator.avatarUrl} color={profile.primaryColor} size={64} />
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <h1 className="truncate text-2xl font-semibold tracking-tight">{profile.name || "Untitled"}</h1>
-              {dirty && profile.name.trim() ? <Badge tone="outline">Saving…</Badge> : null}
+              <h1 className="truncate text-2xl font-semibold tracking-tight">{profile.name || "بدون اسم"}</h1>
+              
             </div>
             <div className="text-sm text-muted-foreground" dir="auto">{profile.channelName}{profile.niche ? ` · ${profile.niche}` : ""}</div>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="ghost" onClick={remove} className="text-muted-foreground hover:text-destructive"><Trash2 /> Delete</Button>
-            <Button variant="secondary" asChild><Link href={`/studio?creator=${creator.id}`}><Wand2 /> Open in Studio</Link></Button>
-            <Button onClick={() => save()} variant={dirty ? "default" : "secondary"} title="Changes save automatically · ⌘S">
-              {!profile.name.trim() ? <><Save /> Name required</> : saving || dirty ? <><Loader2 className="animate-spin" /> Saving…</> : <><Check className="text-success" /> Saved</>}
+            <Button variant="ghost" onClick={remove} className="text-muted-foreground hover:text-destructive"><Trash2 /> <span className="hidden sm:inline">امسح</span></Button>
+            <Button variant="secondary" asChild><Link href={`/?creator=${creator.id}`}><Wand2 /> اعمل ثمبنيل</Link></Button>
+            <Button onClick={() => save()} variant={dirty ? "default" : "secondary"} title="بيتحفظ تلقائي · ⌘S">
+              {!profile.name.trim() ? <><Save /> اكتب الاسم</> : saving || dirty ? <><Loader2 className="animate-spin" /> بيحفظ…</> : <><Check className="text-success" /> اتحفظ</>}
             </Button>
           </div>
         </div>
@@ -167,52 +167,56 @@ export function CreatorEditor({ creator, assets, presets, initialTab }: { creato
 
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
-          <TabsTrigger value="profile"><User /> Profile</TabsTrigger>
-          <TabsTrigger value="dna"><Dna /> Style DNA <Badge tone={completeness > 60 ? "primary" : "outline"}>{completeness}%</Badge></TabsTrigger>
-          {!isNew && <TabsTrigger value="assets"><Images /> Photography & References <Badge tone="outline">{assets.length}</Badge></TabsTrigger>}
-          {!isNew && <TabsTrigger value="presets"><Layers /> Custom presets <Badge tone="outline">{presets.length}</Badge></TabsTrigger>}
+          {!isNew && <TabsTrigger value="assets"><Images /> الصور <Badge tone="outline">{assets.length}</Badge></TabsTrigger>}
+          <TabsTrigger value="profile"><User /> البيانات</TabsTrigger>
+          {!isNew && <TabsTrigger value="dna"><Dna /> الستايل <Badge tone={completeness > 60 ? "primary" : "outline"}>{completeness}%</Badge></TabsTrigger>}
+          {!isNew && <TabsTrigger value="presets"><Layers /> القوالب <Badge tone="outline">{presets.length}</Badge></TabsTrigger>}
         </TabsList>
 
         <TabsContent value="profile">
           <div className="grid gap-6 lg:grid-cols-3">
             <Card className="space-y-4 p-5 lg:col-span-2">
               <div className="grid gap-4 sm:grid-cols-2">
-                <div><Label>Creator name *</Label><Input value={profile.name} onChange={(e) => set("name", e.target.value)} placeholder="e.g. Alex Rivera" /></div>
-                <div><Label>Channel name</Label><Input value={profile.channelName} onChange={(e) => set("channelName", e.target.value)} placeholder="e.g. RIVERA FC" /></div>
-                <div><Label>Niche</Label><Input value={profile.niche} onChange={(e) => set("niche", e.target.value)} placeholder="EA FC, tech, vlog…" /></div>
+                <div><Label>اسم الكريتور *</Label><Input value={profile.name} onChange={(e) => set("name", e.target.value)} placeholder="مثال: مصباح" /></div>
+                <div><Label>اسم القناة</Label><Input value={profile.channelName} onChange={(e) => set("channelName", e.target.value)} placeholder="مثال: Mesbah FC" /></div>
+                <div><Label>المجال</Label><Input value={profile.niche} onChange={(e) => set("niche", e.target.value)} placeholder="EA FC" /></div>
                 <div>
-                  <Label>Primary audience language</Label>
+                  <Label>لغة الجمهور</Label>
                   <NativeSelect value={profile.language} onChange={(e) => set("language", e.target.value)}>
-                    <option value="en">English</option>
-                    <option value="ar">Arabic</option>
-                    <option value="mixed">Arabic + English</option>
+                    <option value="ar">عربي</option>
+                    <option value="en">إنجليزي</option>
+                    <option value="mixed">عربي وإنجليزي</option>
                   </NativeSelect>
                 </div>
               </div>
               <div className="grid gap-4 sm:grid-cols-3">
-                <ColorField label="Primary color" value={profile.primaryColor} onChange={(v) => set("primaryColor", v)} />
-                <ColorField label="Secondary color" value={profile.secondaryColor} onChange={(v) => set("secondaryColor", v)} />
-                <ColorField label="Accent color" value={profile.accentColor} onChange={(v) => set("accentColor", v)} />
+                <ColorField label="اللون الأساسي" value={profile.primaryColor} onChange={(v) => set("primaryColor", v)} />
+                <ColorField label="اللون التاني" value={profile.secondaryColor} onChange={(v) => set("secondaryColor", v)} />
+                <ColorField label="لون مميز" value={profile.accentColor} onChange={(v) => set("accentColor", v)} />
               </div>
+              {!isNew && (
+                <>
               <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Typography preferences" value={profile.typography} onChange={(v) => set("typography", v)} placeholder="Heavy condensed sans, white with black stroke" />
-                <Field label="Background preferences" value={profile.background} onChange={(v) => set("background", v)} placeholder="Dark stadium, blurred, vignette" />
-                <Field label="Retouching style" value={profile.retouching} onChange={(v) => set("retouching", v)} placeholder="Natural skin texture, sharpen eyes, no smoothing" />
-                <Field label="Lighting direction" value={profile.lighting} onChange={(v) => set("lighting", v)} placeholder="Key light camera-left, cyan rim light behind-right" />
-                <Field label="Composition rules" value={profile.compositionRules} onChange={(v) => set("compositionRules", v)} placeholder="One rule per line" />
-                <Field label="Negative instructions" value={profile.negative} onChange={(v) => set("negative", v)} placeholder="No red arrows&#10;No emoji" />
+                <Field label="ستايل الخط" value={profile.typography} onChange={(v) => set("typography", v)} placeholder="مثال: خط عريض أبيض بحدود سودة" />
+                <Field label="الخلفية المفضلة" value={profile.background} onChange={(v) => set("background", v)} placeholder="مثال: استاد غامق بالليل" />
+                <Field label="الريتاتش" value={profile.retouching} onChange={(v) => set("retouching", v)} placeholder="مثال: بشرة طبيعية من غير تنعيم" />
+                <Field label="الإضاءة" value={profile.lighting} onChange={(v) => set("lighting", v)} placeholder="مثال: إضاءة سماوي من ورا" />
+                <Field label="قواعد التكوين" value={profile.compositionRules} onChange={(v) => set("compositionRules", v)} placeholder="قاعدة في كل سطر" />
+                <Field label="ممنوع" value={profile.negative} onChange={(v) => set("negative", v)} placeholder="مثال: من غير أسهم حمرا&#10;من غير إيموجي" />
               </div>
               <div>
-                <Label>Custom master prompt</Label>
-                <Textarea rows={4} value={profile.masterPrompt} onChange={(e) => set("masterPrompt", e.target.value)} placeholder="Overall creative direction for every thumbnail. Supports {{creator}}, {{channel}}, {{concept}}." />
+                <Label>توجيه ثابت لكل الثمبنيلات</Label>
+                <Textarea rows={4} value={profile.masterPrompt} onChange={(e) => set("masterPrompt", e.target.value)} placeholder="حاجة عايزها في كل ثمبنيل للكريتور ده. (اختياري)" />
               </div>
-              <div><Label>Internal notes</Label><Textarea rows={2} value={profile.notes} onChange={(e) => set("notes", e.target.value)} placeholder="Not included in prompts." /></div>
+              <div><Label>ملاحظات</Label><Textarea rows={2} value={profile.notes} onChange={(e) => set("notes", e.target.value)} placeholder="ملاحظات ليك — مش بتدخل في البرومبت." /></div>
+                </>
+              )}
             </Card>
             <div className="space-y-4">
               <Card className="overflow-hidden">
                 <div className="h-28" style={{ background: `linear-gradient(120deg, ${profile.primaryColor}, ${profile.secondaryColor})` }} />
                 <div className="p-4">
-                  <div className="label-xs mb-2">Palette preview</div>
+                  <div className="label-xs mb-2">الألوان</div>
                   <div className="flex gap-2">
                     {[profile.primaryColor, profile.secondaryColor, profile.accentColor].map((c, i) => (
                       <div key={i} className="flex-1"><div className="h-10 rounded-lg ring-1 ring-white/10" style={{ background: c }} /><div className="mt-1 font-mono text-[10px] uppercase text-muted-foreground">{c}</div></div>
@@ -221,11 +225,11 @@ export function CreatorEditor({ creator, assets, presets, initialTab }: { creato
                 </div>
               </Card>
               <Card className="p-4 text-xs leading-relaxed text-muted-foreground">
-                Every field is plain text you control. The prompt compiler turns each line into a rule — nothing is inferred by AI.
+                كل الخانات اختيارية. اللي تكتبه بيدخل في البرومبت كقاعدة — سيب أي خانة فاضية لو مش محتاجها.
               </Card>
               {isNew && (
                 <Button className="w-full" size="lg" onClick={() => save()} disabled={saving}>
-                  {saving ? <Loader2 className="animate-spin" /> : <Save />} Create creator
+                  {saving ? <Loader2 className="animate-spin" /> : <Save />} اعمل الكريتور
                 </Button>
               )}
             </div>
@@ -234,7 +238,7 @@ export function CreatorEditor({ creator, assets, presets, initialTab }: { creato
 
         <TabsContent value="dna">
           <DnaEditor dna={dna} onChange={setDna} />
-          {isNew && <Button className="mt-6" size="lg" onClick={() => save()} disabled={saving}>{saving ? <Loader2 className="animate-spin" /> : <Save />} Create creator</Button>}
+          
         </TabsContent>
 
         {!isNew && (
@@ -267,7 +271,7 @@ function DnaEditor({ dna, onChange }: { dna: StyleDna; onChange: (d: StyleDna) =
       <Card className="mb-5 flex flex-wrap items-center gap-4 p-4 text-sm">
         <Dna className="h-5 w-5 text-primary" />
         <div className="flex-1 text-muted-foreground">
-          Style DNA is the creator&apos;s editable creative identity. Write one rule per line. <span className="text-foreground">Locked</span> categories are core identity and are enforced in Safe, Creative <em>and</em> Experimental variations; unlocked rules are loosened in bolder variations.
+          هنا ستايل القناة الثابت — اكتب قاعدة في كل سطر، وسيب الفاضي فاضي. القسم <span className="text-foreground">المقفول</span> بيتطبّق دايمًا حتى في الوضع التجريبي.
         </div>
       </Card>
       <div className="grid gap-4 md:grid-cols-2">
@@ -278,18 +282,18 @@ function DnaEditor({ dna, onChange }: { dna: StyleDna; onChange: (d: StyleDna) =
               <div className="mb-2 flex items-start justify-between gap-3">
                 <div>
                   <div className="flex items-center gap-2 text-sm font-medium">
-                    {cat.label}
+                    {cat.labelAr}
                     {entry.rules.trim() && <span className="h-1.5 w-1.5 rounded-full bg-primary" />}
                   </div>
-                  <div className="text-xs text-muted-foreground">{cat.hint}</div>
+                  <div className="text-xs text-muted-foreground">{cat.hintAr}</div>
                 </div>
                 <label className="flex shrink-0 cursor-pointer items-center gap-2 text-[11px] text-muted-foreground">
                   {entry.locked ? <Lock className="h-3.5 w-3.5 text-primary" /> : <LockOpen className="h-3.5 w-3.5" />}
-                  Locked
-                  <Switch checked={entry.locked} onChange={(v) => onChange({ ...dna, [cat.key]: { ...entry, locked: v } })} label={`Lock ${cat.label}`} />
+                  ثابت
+                  <Switch checked={entry.locked} onChange={(v) => onChange({ ...dna, [cat.key]: { ...entry, locked: v } })} label={`ثبّت ${cat.labelAr}`} />
                 </label>
               </div>
-              <Textarea rows={3} value={entry.rules} placeholder={cat.placeholder} onChange={(e) => onChange({ ...dna, [cat.key]: { ...entry, rules: e.target.value } })} />
+              <Textarea rows={3} value={entry.rules} placeholder="قاعدة في كل سطر" onChange={(e) => onChange({ ...dna, [cat.key]: { ...entry, rules: e.target.value } })} />
             </Card>
           );
         })}

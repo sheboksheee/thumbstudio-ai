@@ -22,8 +22,8 @@ export function CompareDialog({ open, onOpenChange, items, creatorById }: { open
   return (
     <Dialog open={open && items.length === 2} onOpenChange={onOpenChange}>
       <DialogContent wide="full">
-        <DialogHeader title="Compare thumbnails" description="Side-by-side or drag the divider to compare details." />
-        <Segmented className="mb-4 w-auto" size="sm" value={mode} onChange={setMode} options={[{ value: "side", label: "Side by side", icon: <Columns2 /> }, { value: "slider", label: "Slider", icon: <SplitSquareHorizontal /> }]} />
+        <DialogHeader title="قارن بين تصميمين" description="جنب بعض، أو اسحب الخط في النص." />
+        <Segmented className="mb-4 w-auto" size="sm" value={mode} onChange={setMode} options={[{ value: "side", label: "جنب بعض", icon: <Columns2 /> }, { value: "slider", label: "سلايدر", icon: <SplitSquareHorizontal /> }]} />
         {a && b && (mode === "side" ? (
           <div className="grid gap-4 md:grid-cols-2">
             {[a, b].map((r) => (
@@ -40,6 +40,7 @@ export function CompareDialog({ open, onOpenChange, items, creatorById }: { open
           <div>
             <div
               ref={box}
+              dir="ltr"
               className="relative mx-auto aspect-video max-h-[70vh] cursor-ew-resize select-none overflow-hidden rounded-xl bg-black"
               onPointerDown={(e) => { (e.target as HTMLElement).setPointerCapture(e.pointerId); move(e.clientX); }}
               onPointerMove={(e) => e.buttons === 1 && move(e.clientX)}
@@ -53,8 +54,8 @@ export function CompareDialog({ open, onOpenChange, items, creatorById }: { open
               <div className="absolute inset-y-0 w-0.5 bg-primary shadow-[0_0_12px_hsl(var(--primary))]" style={{ left: `${pos}%` }}>
                 <div className="absolute left-1/2 top-1/2 h-8 w-8 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-primary bg-background/90" />
               </div>
-              <span className="absolute left-3 top-3 rounded bg-black/75 px-2 py-0.5 text-xs">A · v{a.version}</span>
-              <span className="absolute right-3 top-3 rounded bg-black/75 px-2 py-0.5 text-xs">B · v{b.version}</span>
+              <span className="absolute left-3 top-3 rounded bg-black/75 px-2 py-0.5 text-xs">A · نسخة {a.version}</span>
+              <span className="absolute right-3 top-3 rounded bg-black/75 px-2 py-0.5 text-xs">B · نسخة {b.version}</span>
             </div>
             <div className="mt-3 grid gap-4 md:grid-cols-2">
               <Caption r={a} creator={creatorById.get(a.creatorId)} label="A" />
@@ -71,7 +72,7 @@ function Caption({ r, creator, label }: { r: ResultDTO; creator?: LibCreator; la
   return (
     <div className="mt-2 flex items-start justify-between gap-3 text-xs">
       <div className="min-w-0">
-        <div className="truncate font-medium" dir="auto">{label && <span className="mr-1 text-primary">{label}</span>}{r.concept || "Untitled"} · v{r.version}</div>
+        <div className="truncate font-medium" dir="auto">{label && <span className="mr-1 text-primary">{label}</span>}{r.concept || "بدون اسم"} · نسخة {r.version}</div>
         <div className="text-muted-foreground">{creator?.name} · {r.variation || "—"} · {r.width}×{r.height}</div>
         {r.feedback && <div className="mt-1 line-clamp-2 text-muted-foreground" dir="auto">“{r.feedback}”</div>}
       </div>

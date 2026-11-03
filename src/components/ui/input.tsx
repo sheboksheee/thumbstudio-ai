@@ -36,9 +36,9 @@ const CHEVRON = "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/200
 export const NativeSelect = React.forwardRef<HTMLSelectElement, React.SelectHTMLAttributes<HTMLSelectElement>>(({ className, children, style, ...props }, ref) => (
   <select
     ref={ref}
-    style={{ backgroundImage: CHEVRON, backgroundRepeat: "no-repeat", backgroundPosition: "right 0.6rem center", ...style }}
+    style={{ backgroundImage: CHEVRON, backgroundRepeat: "no-repeat", ...style }}
     className={cn(
-      "h-9 w-full appearance-none rounded-lg border border-input bg-background/60 pl-3 pr-8 text-sm focus-visible:border-primary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25",
+      "ts-select h-9 w-full appearance-none rounded-lg border border-input bg-background/60 ps-3 pe-8 text-sm focus-visible:border-primary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25",
       className,
     )}
     {...props}

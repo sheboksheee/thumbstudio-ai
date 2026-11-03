@@ -47,5 +47,7 @@
     background-size: 16px 16px;
     background-position: 0 0, 0 8px, 8px -8px, -8px 0;
   }
+  .ts-select { background-position: right 0.6rem center; }
+  [dir="rtl"] .ts-select { background-position: left 0.6rem center; }
   .glow-ring { box-shadow: 0 0 0 1px hsl(var(--primary) / .55), 0 0 24px -6px hsl(var(--primary) / .55); }
 }

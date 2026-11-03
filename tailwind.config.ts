@@ -25,7 +25,7 @@ export default {
       },
       borderRadius: { lg: "var(--radius)", md: "calc(var(--radius) - 2px)", sm: "calc(var(--radius) - 4px)" },
       fontFamily: {
-        sans: ["Inter", "-apple-system", "BlinkMacSystemFont", "SF Pro Text", "Segoe UI", "SF Arabic", "Geeza Pro", "Noto Sans Arabic", "system-ui", "sans-serif"],
+        sans: ["var(--font-ar)", "-apple-system", "BlinkMacSystemFont", "SF Pro Text", "Segoe UI", "SF Arabic", "Geeza Pro", "Noto Sans Arabic", "system-ui", "sans-serif"],
         mono: ["SF Mono", "JetBrains Mono", "Menlo", "ui-monospace", "monospace"],
       },
       keyframes: {

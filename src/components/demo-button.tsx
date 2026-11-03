@@ -12,11 +12,11 @@ export function DemoButton({ reset = false, label }: { reset?: boolean; label?: 
       variant="secondary"
       disabled={busy}
       onClick={async () => {
-        if (reset && !confirm("This deletes ALL creators, projects, results and images in this browser, then reloads the example data. Continue?")) return;
+        if (reset && !confirm("ده هيمسح كل الكريتورز والمشاريع والنتايج والصور اللي في المتصفح ده، ويرجّع الأمثلة. متأكد؟")) return;
         setBusy(true);
         try {
           await seedExampleData({ reset });
-          toast.success(reset ? "Data reset to examples" : "Example creators loaded");
+          toast.success(reset ? "رجعت للأمثلة" : "الأمثلة اتضافت");
         } catch (e) {
           toast.error((e as Error).message);
         } finally {
@@ -25,7 +25,7 @@ export function DemoButton({ reset = false, label }: { reset?: boolean; label?: 
       }}
     >
       {busy ? <Loader2 className="animate-spin" /> : <Sparkles />}
-      {label ?? (reset ? "Reset to example data" : "Load example creators")}
+      {label ?? (reset ? "امسح كل حاجة وارجع للأمثلة" : "ضيف كريتورز أمثلة")}
     </Button>
   );
 }
