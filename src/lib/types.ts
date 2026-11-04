@@ -82,6 +82,7 @@ export interface ProjectRecord {
   variation: string;
   promptStyle?: string;
   sceneId?: string;
+  cardMode?: string;
   selectedAssetIds: string[];
   compiledPrompt: string;
   createdAt: string;
@@ -149,6 +150,6 @@ export const DEFAULT_SETTINGS: AppSettings = {
   defaultReferencePriority: "balanced",
   exportFormat: "jpg",
   exportFit: "cover",
-  promptStyle: "concise",
+  promptStyle: "quick",
   gameName: "EA FC 27",
 };

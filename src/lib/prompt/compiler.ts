@@ -16,7 +16,7 @@
  *   7. Negative constraints
  */
 import { DNA_CATEGORIES, type StyleDna } from "../style-dna";
-import { GENERIC_SCENE, detectEmotion, detectScenes, sceneById } from "./scenes";
+import { GENERIC_SCENE, SCENE_SHORT, detectEmotion, detectScenes, sceneById } from "./scenes";
 import type {
   AssetKind,
   ColorMood,
@@ -25,6 +25,7 @@ import type {
   SubjectScale,
   TextMode,
   Variation,
+  CardMode,
 } from "../options";
 
 export interface CompilerCreator {
@@ -85,9 +86,11 @@ export interface CompilerOptions {
   sceneId?: string;
   /** Game name used in the prompt, e.g. "EA FC 27". */
   gameName?: string;
+  /** How the card appears: auto | attached | mystery | multiple | none */
+  cardMode?: CardMode;
 }
 
-export type PromptStyle = "concise" | "detailed";
+export type PromptStyle = "quick" | "concise" | "detailed";
 
 export interface CompileInput {
   creator: CompilerCreator;
@@ -210,6 +213,7 @@ const SCALE_TEXT: Record<SubjectScale, string> = {
 };
 
 const MOOD_TEXT: Record<Exclude<ColorMood, "creator" | "custom">, string> = {
+  card: "the whole image color-matched to the card: its dominant color plus gold highlights",
   warm: "warm, golden-hour grade with amber highlights and rich contrast",
   cold: "cold, icy grade with cyan/blue shadows and crisp highlights",
   neon: "electric neon grade with saturated accent glows on a dark base",
@@ -247,7 +251,128 @@ const VARIATION_TEXT: Record<Variation, { label: string; direction: string[] }> 
 // Compiler
 
 export function compilePrompt(input: CompileInput): CompileOutput {
-  return input.options.promptStyle === "detailed" ? compileDetailed(input) : compileConcise(input);
+  const style = input.options.promptStyle;
+  if (style === "detailed") return compileDetailed(input);
+  if (style === "concise") return compileConcise(input);
+  return compileQuick(input);
+}
+
+// ---------------------------------------------------------------------------
+// Quick brief (default)
+//
+// Modelled on the short prompt the art director writes by hand, which gives the
+// best results: ChatGPT already knows the style of top EA FC thumbnails, so we
+// only add what it cannot guess — whose face to keep, where things go, what the
+// card is, and where the title will be placed later.
+
+const QUICK_SCALE: Record<SubjectScale, string> = {
+  medium: ", waist-up",
+  large: ", big and close to the camera",
+  xl: ", very big and close to the camera",
+  closeup: ", extreme close-up",
+};
+const OTHER_SIDE: Record<SubjectPosition, string> = { right: "on the left side", left: "on the right side", center: "next to them" };
+
+function compileQuick(input: CompileInput): CompileOutput {
+  const { creator, preset, options } = input;
+  const who = creator.name;
+  const ordered = orderAssets(input.assets);
+  const attachments: AttachmentItem[] = ordered.map((a, i) => ({
+    index: i + 1,
+    assetId: a.id,
+    kind: a.kind,
+    label: a.label?.trim() || `${a.kind} image`,
+    role: conciseRole(a, who, options.referencePriority) + (a.purpose?.trim() ? ` (${a.purpose.trim()})` : ""),
+    purpose: a.purpose?.trim() || "",
+  }));
+  const hasIdentity = attachments.some((a) => a.kind === "face" || a.kind === "expression");
+  const warnings = baseWarnings(options, attachments, hasIdentity);
+  const concept = options.concept.trim();
+  const headline = (options.headline ?? "").trim();
+  const football = isFootballNiche(creator.niche, preset?.niche) || !creator.niche?.trim();
+  const game = football ? options.gameName?.trim() || "EA FC" : creator.niche?.trim() || "";
+  const nums = (list: AttachmentItem[]) => (list.length === 1 ? `image ${list[0].index}` : `images ${list.map((a) => a.index).join(", ")}`);
+
+  const faceImgs = attachments.filter((a) => a.kind === "face");
+  const exprImgs = attachments.filter((a) => a.kind === "expression");
+  const cardImgs = attachments.filter((a) => a.kind === "asset");
+  const refImgs = attachments.filter((a) => a.kind === "reference");
+  const logoImgs = attachments.filter((a) => a.kind === "logo" || a.kind === "avatar");
+
+  const out: string[] = [];
+  out.push(`Create a professional advanced YouTube thumbnail design${game ? ` for ${/^[aeiouAEIOU]/.test(game) ? "an" : "a"} ${game} video` : ""}.`);
+  if (concept) out.push(`The video content is: "${concept}"`);
+
+  // The creator
+  const idImgs = [...faceImgs, ...exprImgs];
+  const pos = options.subjectPosition === "center" ? "in the center" : `on the ${options.subjectPosition} side`;
+  if (idImgs.length) {
+    out.push(`${who} (the person in ${nums(idImgs)}) ${pos}${QUICK_SCALE[options.subjectScale]} — keep the face exactly the same as the photo.`);
+  } else {
+    out.push(`${who} ${pos}${QUICK_SCALE[options.subjectScale]}.`);
+  }
+  if (exprImgs.length && faceImgs.length) out.push(`Use the expression from ${nums(exprImgs)}.`);
+
+  // The card
+  const side = OTHER_SIDE[options.subjectPosition];
+  const mode: CardMode = options.cardMode ?? "auto";
+  if (mode === "multiple") {
+    out.push(`A row of several big glowing cards ${side}${cardImgs.length ? `, including the card from ${nums(cardImgs)} exactly as it is` : ""}.`);
+  } else if (mode === "mystery") {
+    out.push(`A big glowing mystery card ${side} — only the card design, with no player on it.`);
+  } else if (mode !== "none" && cardImgs.length) {
+    out.push(`The card in ${nums(cardImgs)} ${side}, big and exactly as it is.`);
+  }
+  if (mode === "attached" && !cardImgs.length) warnings.push("اخترت «الكرت اللي رفعته» بس مفيش صورة كرت مرفوعة.");
+
+  // Background — related to the topic
+  const scene = football ? sceneById(options.sceneId) ?? detectScenes(concept)[0] : undefined;
+  if (options.backgroundDirection?.trim()) out.push(`Background: ${options.backgroundDirection.trim()}.`);
+  else out.push(`Background related to the video topic, from the game${scene && SCENE_SHORT[scene.id] ? ` (${SCENE_SHORT[scene.id]})` : ""}.`);
+
+  // Colour
+  if (options.colorMood === "creator") out.push(`Colors: ${[creator.primaryColor, creator.accentColor].filter(Boolean).join(" and ")}.`);
+  else if (options.colorMood === "custom" && options.colorMoodCustom?.trim()) out.push(`Colors: ${options.colorMoodCustom.trim()}.`);
+  else if (options.colorMood !== "custom") out.push(`${MOOD_SHORT[options.colorMood][0].toUpperCase()}${MOOD_SHORT[options.colorMood].slice(1)}.`);
+
+  // Extra images
+  if (refImgs.length) out.push(`Match the style of ${nums(refImgs)} (not its people or text).`);
+  if (logoImgs.length) out.push(`The channel logo from ${nums(logoImgs)}, small in a corner.`);
+
+  // Creator's own rules, only if filled in
+  const own: string[] = [];
+  for (const cat of DNA_CATEGORIES) {
+    const e = creator.styleDna[cat.key];
+    if (e.rules.trim() && cat.key !== "constraints") own.push(shortLine(e.rules));
+  }
+  if (own.length) out.push(`Style: ${own.join("; ")}.`);
+  const master = creator.masterPrompt?.trim();
+  if (master) out.push(fillTemplate(master, { concept, headline, creator: who, channel: creator.channelName, position: options.subjectPosition, scale: options.subjectScale }).replace(/\s*\n\s*/g, " "));
+  const custom = toRules(options.customInstructions);
+  if (custom.length) out.push(custom.join(". ") + ".");
+  if (options.variation === "creative") out.push("Make it bolder and more creative than usual.");
+  if (options.variation === "experimental") out.push("Try an unexpected, surprising idea.");
+
+  // Text
+  if (options.textMode === "render" && headline) {
+    const ar = detectScript(headline) === "arabic" || detectScript(headline) === "mixed";
+    out.push(`Text: only "${headline.replace(/\s*\n\s*/g, " / ")}"${ar ? ", written correctly in Arabic" : ""}.`);
+  } else if (options.textMode === "space") {
+    out.push("No additional text — leave space at the bottom center for a title I will add later.");
+  } else out.push("No additional text.");
+
+  const avoid = [...toRules(creator.styleDna.constraints.rules), ...toRules(creator.negative)];
+  if (avoid.length) out.push(`Avoid: ${avoid.join(", ")}.`);
+  out.push("16:9, advanced design level.");
+
+  const prompt = out.join("\n").trim() + "\n";
+  return {
+    prompt,
+    attachments,
+    manifest: buildManifest(creator, preset ?? null, options, attachments),
+    warnings,
+    stats: { characters: prompt.length, words: prompt.split(/\s+/).filter(Boolean).length, sections: out.length },
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -265,6 +390,7 @@ const SCALE_SHORT: Record<SubjectScale, string> = {
   closeup: "close-up, face filling that side of the frame",
 };
 const MOOD_SHORT: Record<Exclude<ColorMood, "creator" | "custom">, string> = {
+  card: "the whole image color-matched to the card (its main color plus gold highlights)",
   warm: "warm golden tones",
   cold: "cold icy blue tones",
   neon: "electric neon accents on a dark base",

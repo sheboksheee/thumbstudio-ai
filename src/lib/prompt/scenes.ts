@@ -177,6 +177,8 @@ export const GENERIC_SCENE: Scene = {
   emotion: "a strong, believable reaction that fits the video",
 };
 
+const GENERIC_TOPICS = new Set(["card", "sbc", "gameplay", "comeback"]);
+
 function norm(s: string) {
   return ` ${s.toLowerCase().replace(/[أإآ]/g, "ا").replace(/ة/g, "ه").replace(/[^\p{L}\p{N}]+/gu, " ")} `;
 }
@@ -193,7 +195,8 @@ export function detectScenes(concept: string): Scene[] {
       const hit = isLatin ? text.includes(` ${nk} `) : text.includes(nk);
       if (hit) score += nk.length > 3 ? 2 : 1;
     }
-    return { sc, score };
+    // Generic words ("card", "challenge", "again") count less than specific topics (hero, pack, TOTY…).
+    return { sc, score: score * (GENERIC_TOPICS.has(sc.id) ? 0.75 : 1) };
   });
   return scored.filter((x) => x.score > 0).sort((a, b) => b.score - a.score).map((x) => x.sc);
 }
@@ -215,3 +218,21 @@ export function detectEmotion(concept: string): string | undefined {
   for (const [words, emotion] of EMOTION_WORDS) if (words.some((w) => t.includes(w))) return emotion;
   return undefined;
 }
+
+/** Short English hint per topic, used by the quick prompt ("Background related to the topic, e.g. …"). */
+export const SCENE_SHORT: Record<string, string> = {
+  card: "an EA FC stadium at night with floodlights",
+  pack: "an EA FC pack-opening walkout scene",
+  evolution: "a card evolution / upgrade effect",
+  champions: "a FUT Champions arena with the trophy",
+  rivals: "a Division Rivals match atmosphere",
+  squad: "a pitch with a squad of FUT cards",
+  sbc: "an SBC reward / upgrade pack moment",
+  tactics: "a glowing tactics board on the pitch",
+  icon: "a legendary Icon / Hero card reveal atmosphere",
+  promo: "the current promo's signature colors and effects",
+  op: "electric energy around an overpowered card",
+  coins: "golden FUT coins and a profit vibe",
+  gameplay: "an in-game action moment in a packed stadium",
+  comeback: "a forgotten card stepping back into the spotlight",
+};

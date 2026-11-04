@@ -18,6 +18,7 @@ export const TEXT_MODES = [
 ] as const;
 
 export const COLOR_MOODS = [
+  { value: "card", label: "ألوان الكرت" },
   { value: "creator", label: "ألوان القناة" },
   { value: "warm", label: "دافي / دهبي" },
   { value: "cold", label: "بارد / تلجي" },
@@ -40,9 +41,19 @@ export const VARIATIONS = [
 ] as const;
 
 export const PROMPT_STYLES = [
-  { value: "concise", label: "مختصر", desc: "برومبت قصير وواضح — غالبًا بيدي أحسن نتيجة." },
+  { value: "quick", label: "سريع", desc: "قصير زي البرومبت اللي بتكتبه بإيدك — ChatGPT بيكمّل الباقي." },
+  { value: "concise", label: "متوسط", desc: "بيوصف مشهد من اللعبة حسب موضوع الفيديو." },
   { value: "detailed", label: "مفصّل", desc: "كل القواعد مكتوبة بالتفصيل." },
 ] as const;
+
+export const CARD_MODES = [
+  { value: "auto", label: "تلقائي", desc: "لو رفعت كرت هيتحط زي ما هو" },
+  { value: "attached", label: "الكرت اللي رفعته", desc: "الكرت بالظبط زي الصورة" },
+  { value: "mystery", label: "كرت فاضي", desc: "تصميم الكرت من غير لاعب" },
+  { value: "multiple", label: "كذا كرت", desc: "صف كروت" },
+  { value: "none", label: "من غير كرت", desc: "" },
+] as const;
+export type CardMode = (typeof CARD_MODES)[number]["value"];
 
 export const ASSET_KINDS = [
   { value: "face", label: "وش الكريتور", desc: "صور واضحة لوش الكريتور" },

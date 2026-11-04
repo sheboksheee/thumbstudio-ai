@@ -198,3 +198,51 @@ describe("scene + emotion detection", () => {
     expect(detectEmotion("خسرت كل الكوينز")).toContain("frustrated");
   });
 });
+
+describe("quick brief (default prompt style)", () => {
+  const quick = (over: Partial<CompileInput["options"]> = {}, assets?: CompileInput["assets"]) => {
+    const input = base({ promptStyle: undefined, gameName: "EA FC 27", textMode: "space", colorMood: "card", subjectPosition: "right", ...over });
+    input.preset = null;
+    if (assets) input.assets = assets;
+    return compilePrompt(input);
+  };
+  const faceAndCard = [
+    { id: "f", kind: "face", label: "me", priority: 1 },
+    { id: "c", kind: "asset", label: "card", priority: 3 },
+  ];
+
+  it("is the default and stays short like a hand-written prompt", () => {
+    const out = quick({ concept: "How have I not played with this card?" }, faceAndCard);
+    expect(out.prompt.startsWith("Create a professional advanced YouTube thumbnail design for an EA FC 27 video.")).toBe(true);
+    expect(out.stats.words).toBeLessThan(160);
+    expect(out.prompt).toContain('The video content is: "How have I not played with this card?"');
+  });
+
+  it("keeps the face, places creator and card on opposite sides", () => {
+    const p = quick({ subjectPosition: "right" }, faceAndCard).prompt;
+    expect(p).toContain("(the person in image 1) on the right side");
+    expect(p).toContain("keep the face exactly the same");
+    expect(p).toContain("The card in image 2 on the left side");
+  });
+
+  it("card modes", () => {
+    expect(quick({ cardMode: "mystery" }, [faceAndCard[0]]).prompt).toContain("mystery card on the left side — only the card design, with no player");
+    expect(quick({ cardMode: "multiple" }, faceAndCard).prompt).toContain("A row of several big glowing cards");
+    expect(quick({ cardMode: "none" }, faceAndCard).prompt).not.toContain("card in image 2");
+  });
+
+  it("leaves space for the title by default and adds no arrows or text", () => {
+    const p = quick({}, faceAndCard).prompt;
+    expect(p).toContain("leave space at the bottom center for a title");
+    expect(p).not.toMatch(/arrow/i);
+  });
+
+  it("adds a topic-related background hint", () => {
+    expect(quick({ concept: "فتحت ٥٠ بكج" }, faceAndCard).prompt).toContain("pack-opening walkout");
+    expect(quick({ concept: "اول تحدي هيرو" }, faceAndCard).prompt).toContain("Icon / Hero");
+  });
+
+  it("colors follow the card by default", () => {
+    expect(quick({}, faceAndCard).prompt).toContain("color-matched to the card");
+  });
+});

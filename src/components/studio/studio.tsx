@@ -15,7 +15,7 @@ import { CreatorAvatar } from "@/components/creator-avatar";
 import { AssetPicker, autoSelect } from "./asset-picker";
 import { compilePrompt, type CompilerOptions, type PromptStyle } from "@/lib/prompt/compiler";
 import { GENERIC_SCENE, SCENES, detectScenes } from "@/lib/prompt/scenes";
-import { COLOR_MOODS, PROMPT_STYLES, REFERENCE_PRIORITIES, SUBJECT_SCALES, VARIATIONS, presetLabel, type Variation } from "@/lib/options";
+import { CARD_MODES, COLOR_MOODS, PROMPT_STYLES, type CardMode, REFERENCE_PRIORITIES, SUBJECT_SCALES, VARIATIONS, presetLabel, type Variation } from "@/lib/options";
 import type { AppSettings, AssetDTO, CreatorWithCounts, PresetDTO, ProjectWithCount } from "@/lib/types";
 import { importResult, saveProject as storeSaveProject, uploadAssets } from "@/lib/store";
 import { BASE_PATH } from "@/lib/hooks";
@@ -33,18 +33,19 @@ interface FormState {
 
 const defaults = (s: AppSettings): CompilerOptions => ({
   concept: "",
-  textMode: "none",
+  textMode: "space",
   headline: "",
   subjectPosition: "right",
   subjectScale: "large",
-  colorMood: "creator",
+  colorMood: "card",
   colorMoodCustom: "",
   backgroundDirection: "",
   referencePriority: (s.defaultReferencePriority as CompilerOptions["referencePriority"]) || "balanced",
   customInstructions: "",
   variation: (s.defaultVariation as Variation) || "safe",
-  promptStyle: (s.promptStyle as PromptStyle) || "concise",
+  promptStyle: (s.promptStyle as PromptStyle) || "quick",
   sceneId: "auto",
+  cardMode: "auto",
   gameName: s.gameName || "EA FC 27",
 });
 
@@ -88,6 +89,7 @@ export function Studio({
             variation: p.variation as Variation,
             promptStyle: (p.promptStyle as PromptStyle) || base.promptStyle,
             sceneId: p.sceneId || "auto",
+            cardMode: (p.cardMode as CardMode) || "auto",
           },
         };
       }
@@ -173,7 +175,7 @@ export function Studio({
       const p = await storeSaveProject(projectId, {
         creatorId, presetId, ...opts,
         headline: opts.headline ?? "", colorMoodCustom: opts.colorMoodCustom ?? "", backgroundDirection: opts.backgroundDirection ?? "",
-        customInstructions: opts.customInstructions ?? "", promptStyle: opts.promptStyle ?? "concise", sceneId: opts.sceneId ?? "auto",
+        customInstructions: opts.customInstructions ?? "", promptStyle: opts.promptStyle ?? "quick", sceneId: opts.sceneId ?? "auto", cardMode: opts.cardMode ?? "auto",
         selectedAssetIds: selected, compiledPrompt: finalPrompt, title: opts.concept.slice(0, 90),
       });
       setProjectId(p.id);
@@ -294,6 +296,7 @@ export function Studio({
   const faceCount = creatorAssets.filter((a) => a.kind === "face" || a.kind === "expression").length;
   const recent = projects.filter((p) => p.creatorId === creatorId).slice(0, 15);
   const faceWarning = compiled?.warnings.some((w) => w.includes("Face/Expression"));
+  const hasCard = selectedAssets.some((a) => a.kind === "asset");
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -389,6 +392,15 @@ export function Studio({
                   })}
                   <Dropzone compact busy={uploading} onFiles={addItem} title="ضيف كرت أو عنصر" className="aspect-[4/5] w-24 shrink-0 p-2" />
                 </div>
+                <div className="mt-4">
+                  <div className="mb-2 text-xs text-muted-foreground">الكرت</div>
+                  <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1">
+                    {CARD_MODES.map((m) => (
+                      <SceneChip key={m.value} active={(opts.cardMode ?? "auto") === m.value} onClick={() => set("cardMode", m.value)} label={m.value === "auto" ? `تلقائي${hasCard ? " (الكرت اللي رفعته)" : ""}` : m.label} />
+                    ))}
+                  </div>
+                  {opts.cardMode === "attached" && !hasCard && <div className="mt-2 text-xs text-warning">ارفع صورة الكرت من «ضيف كرت أو عنصر».</div>}
+                </div>
                 {faceWarning && (
                   <div className="mt-3 rounded-xl border border-warning/30 bg-warning/[0.06] p-3 text-xs leading-relaxed text-warning">
                     فيه أكتر من صورة متسجلة إنها «وش الكريتور». لو واحدة منهم كرت أو عنصر، غيّر نوعها لـ «كروت وعناصر» من صفحة الكريتور ← الصور، عشان ChatGPT ميفتكرهاش وشك.
@@ -412,10 +424,11 @@ export function Studio({
                 </div>
                 <div>
                   <Label>الكتابة على الصورة</Label>
-                  <Segmented value={opts.textMode} onChange={(v) => set("textMode", v)} options={[{ value: "none", label: "من غير" }, { value: "render", label: "عنوان" }, { value: "space", label: "سيب مكان" }]} />
+                  <Segmented value={opts.textMode} onChange={(v) => set("textMode", v)} options={[{ value: "space", label: "سيب مكان للعنوان" }, { value: "none", label: "من غير" }, { value: "render", label: "ChatGPT يكتب" }]} />
                   {opts.textMode === "render" && (
                     <Input className="mt-2 text-base" value={opts.headline} onChange={(e) => set("headline", e.target.value)} placeholder="العنوان بالظبط — مثال: أقوى بكج" />
                   )}
+                  {opts.textMode === "space" && <div className="mt-1.5 text-[11px] text-muted-foreground">ChatGPT مش هيكتب حاجة، وهيسيب مكان تحت في النص للعنوان بتاعك.</div>}
                 </div>
               </Card>
 
@@ -505,7 +518,7 @@ export function Studio({
                 <a href={settings.chatgptUrl} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-primary"><ExternalLink className="h-3 w-3" /> chatgpt.com</a>
               </Step>
 
-              <Step n={2} title={compiled.attachments.length ? `ارفع الـ ${compiled.attachments.length} صور دول في ChatGPT بنفس الترتيب` : "مفيش صور مختارة"}>
+              <Step n={2} title={compiled.attachments.length === 1 ? "ارفع الصورة دي في ChatGPT" : compiled.attachments.length ? `ارفع الـ ${compiled.attachments.length} صور دول في ChatGPT بنفس الترتيب` : "مفيش صور مختارة"}>
                 {compiled.attachments.length > 0 ? (
                   <>
                     <div className="flex gap-2 overflow-x-auto pb-1">
